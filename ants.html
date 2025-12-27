@@ -32,7 +32,8 @@
 </head>
 <body>
     <div id="controls">
-        <button id="startStop">Start/Stop</button><br>
+        <button id="startStop">Start/Stop</button>
+        <button id="reset">Reset</button><br>
         <label for="fillPercentage">Fill Percentage:</label>
         <input type="range" id="fillPercentage" min="0" max="100" value="30"><br>
         <label for="noiseLevel">Noise Level:</label>
@@ -54,6 +55,12 @@
                 if (isRunning) {
                     runSimulation();
                 }
+            });
+
+            const resetButton = document.getElementById('reset');
+            resetButton.addEventListener('click', () => {
+                isRunning = false;
+                initialize();
             });
 
             fillPercentageInput.addEventListener('input', (e) => {
