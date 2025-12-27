@@ -118,8 +118,8 @@
             <h3>Controls</h3>
             <button id="dropButton">Drop Balls</button>
             <div class="slider-container">
-                <label>Number of Balls: <span id="ballSliderValue" class="slider-value">100</span></label>
-                <input type="range" id="ballSlider" min="1" max="400" value="100">
+                <label>Number of Balls: <span id="ballSliderValue" class="slider-value">300</span></label>
+                <input type="range" id="ballSlider" min="1" max="400" value="300">
             </div>
             <h3>Physics</h3>
             <div class="slider-container">
@@ -127,12 +127,12 @@
                 <input type="range" id="gravitySlider" min="0.01" max="0.5" step="0.01" value="0.15">
             </div>
             <div class="slider-container">
-                <label>Friction: <span id="frictionValue" class="slider-value">0.98</span></label>
-                <input type="range" id="frictionSlider" min="0.9" max="1.0" step="0.01" value="0.98">
+                <label>Friction: <span id="frictionValue" class="slider-value">0.20</span></label>
+                <input type="range" id="frictionSlider" min="0" max="1" step="0.05" value="0.2">
             </div>
             <div class="slider-container">
-                <label>Bounce: <span id="bounceValue" class="slider-value">0.4</span></label>
-                <input type="range" id="bounceSlider" min="0.1" max="0.9" step="0.05" value="0.4">
+                <label>Bounce: <span id="bounceValue" class="slider-value">0.6</span></label>
+                <input type="range" id="bounceSlider" min="0.1" max="0.9" step="0.05" value="0.6">
             </div>
             <div class="stats">
                 <h3>Statistics</h3>
@@ -149,8 +149,8 @@
         const Physics = {
             // Configuration
             gravity: 0.15,
-            friction: 0.98,
-            bounce: 0.4,
+            friction: 0.98,  // Internal value: 1.0 = no friction, 0.9 = max friction
+            bounce: 0.6,
 
             // Vector operations
             distance(x1, y1, x2, y2) {
@@ -370,7 +370,7 @@
         let doorsOpen = false;
         let doorAngle = 0;
         const DOOR_MAX_ANGLE = Math.PI / 2;
-        let numBalls = 100;
+        let numBalls = 300;
 
         // ======================
         // Initialization
@@ -886,8 +886,10 @@
         });
 
         frictionSlider.addEventListener('input', (e) => {
-            Physics.friction = parseFloat(e.target.value);
-            frictionValue.textContent = Physics.friction.toFixed(2);
+            const sliderVal = parseFloat(e.target.value);
+            // Convert: 0 = least friction (1.0), 1 = most friction (0.9)
+            Physics.friction = 1.0 - sliderVal * 0.1;
+            frictionValue.textContent = sliderVal.toFixed(2);
         });
 
         bounceSlider.addEventListener('input', (e) => {
