@@ -38,7 +38,7 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            min-width: 150px;
+            min-width: 180px;
         }
 
         .control-panel h3 {
@@ -70,6 +70,28 @@
             cursor: not-allowed;
         }
 
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .slider-container label {
+            color: #7faadb;
+            font-size: 14px;
+        }
+
+        .slider-container input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .slider-value {
+            color: #4CAF50;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
         canvas {
             display: block;
             background: #16213e;
@@ -95,6 +117,10 @@
         <div class="control-panel">
             <h3>Controls</h3>
             <button id="dropButton">Drop Balls</button>
+            <div class="slider-container">
+                <label>Number of Balls: <span id="ballSliderValue" class="slider-value">150</span></label>
+                <input type="range" id="ballSlider" min="1" max="1000" value="150">
+            </div>
             <div class="stats">
                 <h3>Statistics</h3>
                 <div>Balls: <span id="ballCount">0</span></div>
@@ -109,9 +135,10 @@
         const dropButton = document.getElementById('dropButton');
         const ballCountSpan = document.getElementById('ballCount');
         const binCountSpan = document.getElementById('binCount');
+        const ballSlider = document.getElementById('ballSlider');
+        const ballSliderValue = document.getElementById('ballSliderValue');
 
         // Configuration
-        const BALL_RADIUS = 6;
         const NAIL_RADIUS = 4;
         const GRAVITY = 0.25;
         const BOUNCE_DAMPING = 0.5;
@@ -125,9 +152,9 @@
 
         const RESERVOIR_TOP = 20;
         const RESERVOIR_HEIGHT = 120;
-        const RESERVOIR_WIDTH = NAILBOARD_WIDTH; // Same width as nailboard
+        const RESERVOIR_WIDTH = NAILBOARD_WIDTH;
         const RESERVOIR_X = NAILBOARD_X;
-        const SLANT_HEIGHT = 40; // Height of the slanted bottom section
+        const SLANT_HEIGHT = 50; // Height of the slanted bottom section
 
         const NAILBOARD_TOP = RESERVOIR_TOP + RESERVOIR_HEIGHT + 50;
         const NAILBOARD_HEIGHT = 380;
@@ -136,28 +163,52 @@
         const BIN_HEIGHT = 180;
         const BIN_WIDTH = NAILBOARD_WIDTH / NUM_BINS;
 
+        // Door configuration
+        const DOOR_WIDTH = 15; // Smaller opening
+        const DOOR_HINGE_X_LEFT = canvas.width / 2 - DOOR_WIDTH;
+        const DOOR_HINGE_X_RIGHT = canvas.width / 2 + DOOR_WIDTH;
+
         // State
         let balls = [];
         let nails = [];
         let doorsOpen = false;
-        let doorOpenAmount = 0;
-        const DOOR_OPEN_MAX = 25;
+        let doorAngle = 0; // Angle of hinged doors (0 = closed, Math.PI/2 = fully open)
+        const DOOR_ANGLE_MAX = Math.PI / 2.5;
+        let numBalls = 150;
+        let ballRadius = 6;
+
+        // Calculate ball radius based on number of balls
+        function calculateBallRadius(count) {
+            // Scale radius from 6 (few balls) down to 2 (1000 balls)
+            if (count <= 50) return 6;
+            if (count <= 150) return 5;
+            if (count <= 300) return 4;
+            if (count <= 500) return 3;
+            return 2;
+        }
 
         // Initialize balls in reservoir
         function initBalls() {
             balls = [];
-            const numBalls = 150; // Significantly more balls
-            const cols = 20;
+            ballRadius = calculateBallRadius(numBalls);
+
+            const reservoirUsableHeight = RESERVOIR_HEIGHT - SLANT_HEIGHT - 10;
+            const reservoirUsableWidth = RESERVOIR_WIDTH - 20;
+
+            // Calculate grid layout
+            const ballDiameter = ballRadius * 2 + 1;
+            const cols = Math.floor(reservoirUsableWidth / ballDiameter);
             const rows = Math.ceil(numBalls / cols);
-            const spacingX = (RESERVOIR_WIDTH - 40) / cols;
-            const spacingY = (RESERVOIR_HEIGHT - SLANT_HEIGHT - 30) / rows;
 
             for (let i = 0; i < numBalls; i++) {
                 const col = i % cols;
                 const row = Math.floor(i / cols);
+                const x = RESERVOIR_X + 10 + ballRadius + col * ballDiameter + (Math.random() - 0.5) * 2;
+                const y = RESERVOIR_TOP + 10 + ballRadius + row * ballDiameter + (Math.random() - 0.5) * 2;
+
                 balls.push({
-                    x: RESERVOIR_X + 20 + col * spacingX + (Math.random() - 0.5) * 5,
-                    y: RESERVOIR_TOP + 15 + row * spacingY + (Math.random() - 0.5) * 5,
+                    x: x,
+                    y: Math.min(y, RESERVOIR_TOP + reservoirUsableHeight),
                     vx: (Math.random() - 0.5) * 0.5,
                     vy: 0,
                     inReservoir: true,
@@ -167,16 +218,17 @@
             }
         }
 
-        // Initialize nails
+        // Initialize nails - first row has nail in middle
         function initNails() {
             nails = [];
             const rowSpacing = NAILBOARD_HEIGHT / (NUM_ROWS + 1);
 
             for (let row = 0; row < NUM_ROWS; row++) {
                 const y = NAILBOARD_TOP + rowSpacing * (row + 1);
-                const isEvenRow = row % 2 === 0;
-                const numNails = isEvenRow ? 10 : 11;
-                const startOffset = isEvenRow ? BIN_WIDTH : BIN_WIDTH / 2;
+                // Reversed: odd rows (0, 2, 4...) have nail in center (11 nails), even rows have gaps
+                const isOddRow = row % 2 === 0;
+                const numNails = isOddRow ? 11 : 10;
+                const startOffset = isOddRow ? BIN_WIDTH / 2 : BIN_WIDTH;
 
                 for (let i = 0; i < numNails; i++) {
                     const x = NAILBOARD_X + startOffset + i * BIN_WIDTH;
@@ -188,12 +240,14 @@
         }
 
         // Get the Y position of the slanted reservoir bottom at a given X
+        // Now slopes DOWN toward center (edges are higher)
         function getReservoirBottomY(x) {
             const centerX = canvas.width / 2;
             const distFromCenter = Math.abs(x - centerX);
             const maxDist = RESERVOIR_WIDTH / 2;
-            const slantRatio = distFromCenter / maxDist;
-            return RESERVOIR_TOP + RESERVOIR_HEIGHT - SLANT_HEIGHT + slantRatio * SLANT_HEIGHT;
+            const slantRatio = 1 - (distFromCenter / maxDist); // Inverted - closer to center = lower
+            const baseY = RESERVOIR_TOP + RESERVOIR_HEIGHT - SLANT_HEIGHT;
+            return baseY + slantRatio * SLANT_HEIGHT;
         }
 
         // Draw reservoir
@@ -202,19 +256,19 @@
             ctx.lineWidth = 3;
 
             const centerX = canvas.width / 2;
-            const bottomY = RESERVOIR_TOP + RESERVOIR_HEIGHT;
-            const topOfSlant = bottomY - SLANT_HEIGHT;
+            const bottomCenterY = RESERVOIR_TOP + RESERVOIR_HEIGHT; // Lowest point at center
+            const bottomEdgeY = RESERVOIR_TOP + RESERVOIR_HEIGHT - SLANT_HEIGHT; // Higher at edges
 
             // Left wall
             ctx.beginPath();
             ctx.moveTo(RESERVOIR_X, RESERVOIR_TOP);
-            ctx.lineTo(RESERVOIR_X, bottomY);
+            ctx.lineTo(RESERVOIR_X, bottomEdgeY);
             ctx.stroke();
 
             // Right wall
             ctx.beginPath();
             ctx.moveTo(RESERVOIR_X + RESERVOIR_WIDTH, RESERVOIR_TOP);
-            ctx.lineTo(RESERVOIR_X + RESERVOIR_WIDTH, bottomY);
+            ctx.lineTo(RESERVOIR_X + RESERVOIR_WIDTH, bottomEdgeY);
             ctx.stroke();
 
             // Top wall
@@ -223,36 +277,56 @@
             ctx.lineTo(RESERVOIR_X + RESERVOIR_WIDTH, RESERVOIR_TOP);
             ctx.stroke();
 
-            // Slanted bottom - left side
+            // Slanted bottom - left side (slopes down toward center)
             ctx.beginPath();
-            ctx.moveTo(RESERVOIR_X, bottomY);
-            ctx.lineTo(centerX - DOOR_OPEN_MAX - 10, topOfSlant);
+            ctx.moveTo(RESERVOIR_X, bottomEdgeY);
+            ctx.lineTo(DOOR_HINGE_X_LEFT, bottomCenterY);
             ctx.stroke();
 
-            // Slanted bottom - right side
+            // Slanted bottom - right side (slopes down toward center)
             ctx.beginPath();
-            ctx.moveTo(RESERVOIR_X + RESERVOIR_WIDTH, bottomY);
-            ctx.lineTo(centerX + DOOR_OPEN_MAX + 10, topOfSlant);
+            ctx.moveTo(RESERVOIR_X + RESERVOIR_WIDTH, bottomEdgeY);
+            ctx.lineTo(DOOR_HINGE_X_RIGHT, bottomCenterY);
             ctx.stroke();
 
-            // Left door
+            // Draw hinged doors
+            const doorLength = DOOR_WIDTH;
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#6a9ad0';
+
+            // Left door - hinged at DOOR_HINGE_X_LEFT
             ctx.beginPath();
-            ctx.moveTo(centerX - DOOR_OPEN_MAX - 10, topOfSlant);
-            ctx.lineTo(centerX - doorOpenAmount, topOfSlant);
+            ctx.moveTo(DOOR_HINGE_X_LEFT, bottomCenterY);
+            const leftDoorEndX = DOOR_HINGE_X_LEFT + Math.cos(Math.PI/2 - doorAngle) * doorLength;
+            const leftDoorEndY = bottomCenterY + Math.sin(Math.PI/2 - doorAngle) * doorLength;
+            ctx.lineTo(leftDoorEndX, leftDoorEndY);
             ctx.stroke();
 
-            // Right door
+            // Right door - hinged at DOOR_HINGE_X_RIGHT
             ctx.beginPath();
-            ctx.moveTo(centerX + doorOpenAmount, topOfSlant);
-            ctx.lineTo(centerX + DOOR_OPEN_MAX + 10, topOfSlant);
+            ctx.moveTo(DOOR_HINGE_X_RIGHT, bottomCenterY);
+            const rightDoorEndX = DOOR_HINGE_X_RIGHT - Math.cos(Math.PI/2 - doorAngle) * doorLength;
+            const rightDoorEndY = bottomCenterY + Math.sin(Math.PI/2 - doorAngle) * doorLength;
+            ctx.lineTo(rightDoorEndX, rightDoorEndY);
             ctx.stroke();
+
+            // Door hinges (small circles)
+            ctx.fillStyle = '#8ab4e8';
+            ctx.beginPath();
+            ctx.arc(DOOR_HINGE_X_LEFT, bottomCenterY, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(DOOR_HINGE_X_RIGHT, bottomCenterY, 4, 0, Math.PI * 2);
+            ctx.fill();
 
             // Funnel below doors
+            ctx.strokeStyle = '#4a7ab0';
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.moveTo(centerX - DOOR_OPEN_MAX - 10, topOfSlant);
-            ctx.lineTo(centerX - 15, topOfSlant + 40);
-            ctx.moveTo(centerX + DOOR_OPEN_MAX + 10, topOfSlant);
-            ctx.lineTo(centerX + 15, topOfSlant + 40);
+            ctx.moveTo(DOOR_HINGE_X_LEFT - 10, bottomCenterY);
+            ctx.lineTo(centerX - 15, bottomCenterY + 40);
+            ctx.moveTo(DOOR_HINGE_X_RIGHT + 10, bottomCenterY);
+            ctx.lineTo(centerX + 15, bottomCenterY + 40);
             ctx.stroke();
         }
 
@@ -297,15 +371,15 @@
         function drawBalls() {
             for (const ball of balls) {
                 const gradient = ctx.createRadialGradient(
-                    ball.x - 2, ball.y - 2, 0,
-                    ball.x, ball.y, BALL_RADIUS
+                    ball.x - ballRadius * 0.3, ball.y - ballRadius * 0.3, 0,
+                    ball.x, ball.y, ballRadius
                 );
                 gradient.addColorStop(0, '#7fff7f');
                 gradient.addColorStop(1, '#228B22');
 
                 ctx.fillStyle = gradient;
                 ctx.beginPath();
-                ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+                ctx.arc(ball.x, ball.y, ballRadius, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
@@ -313,19 +387,19 @@
         // Update ball physics
         function updateBalls() {
             const centerX = canvas.width / 2;
-            const topOfSlant = RESERVOIR_TOP + RESERVOIR_HEIGHT - SLANT_HEIGHT;
+            const bottomCenterY = RESERVOIR_TOP + RESERVOIR_HEIGHT;
 
             for (const ball of balls) {
                 if (ball.inBin) continue;
 
-                // Check if ball should exit reservoir
-                if (ball.inReservoir && doorsOpen) {
-                    const doorLeft = centerX - doorOpenAmount;
-                    const doorRight = centerX + doorOpenAmount;
+                // Check if ball should exit reservoir through open doors
+                if (ball.inReservoir && doorsOpen && doorAngle > 0.3) {
+                    const doorGapLeft = DOOR_HINGE_X_LEFT;
+                    const doorGapRight = DOOR_HINGE_X_RIGHT;
 
-                    if (ball.y + BALL_RADIUS >= topOfSlant - 5 &&
-                        ball.x > doorLeft + BALL_RADIUS &&
-                        ball.x < doorRight - BALL_RADIUS) {
+                    if (ball.y + ballRadius >= bottomCenterY - 5 &&
+                        ball.x > doorGapLeft + ballRadius &&
+                        ball.x < doorGapRight - ballRadius) {
                         ball.inReservoir = false;
                     }
                 }
@@ -342,59 +416,51 @@
                 ball.y += ball.vy;
 
                 if (ball.inReservoir) {
-                    // Reservoir collision
-                    const doorLeft = centerX - doorOpenAmount;
-                    const doorRight = centerX + doorOpenAmount;
+                    const bottomEdgeY = RESERVOIR_TOP + RESERVOIR_HEIGHT - SLANT_HEIGHT;
 
                     // Left wall
-                    if (ball.x - BALL_RADIUS < RESERVOIR_X) {
-                        ball.x = RESERVOIR_X + BALL_RADIUS;
+                    if (ball.x - ballRadius < RESERVOIR_X) {
+                        ball.x = RESERVOIR_X + ballRadius;
                         ball.vx = -ball.vx * BOUNCE_DAMPING;
                     }
                     // Right wall
-                    if (ball.x + BALL_RADIUS > RESERVOIR_X + RESERVOIR_WIDTH) {
-                        ball.x = RESERVOIR_X + RESERVOIR_WIDTH - BALL_RADIUS;
+                    if (ball.x + ballRadius > RESERVOIR_X + RESERVOIR_WIDTH) {
+                        ball.x = RESERVOIR_X + RESERVOIR_WIDTH - ballRadius;
                         ball.vx = -ball.vx * BOUNCE_DAMPING;
                     }
                     // Top
-                    if (ball.y - BALL_RADIUS < RESERVOIR_TOP) {
-                        ball.y = RESERVOIR_TOP + BALL_RADIUS;
+                    if (ball.y - ballRadius < RESERVOIR_TOP) {
+                        ball.y = RESERVOIR_TOP + ballRadius;
                         ball.vy = -ball.vy * BOUNCE_DAMPING;
                     }
 
-                    // Slanted bottom collision
+                    // Slanted bottom collision (slopes down toward center)
                     const slantY = getReservoirBottomY(ball.x);
 
-                    // Check if ball is on the slanted surface
-                    if (ball.y + BALL_RADIUS > slantY) {
+                    if (ball.y + ballRadius > slantY) {
                         // Check if ball is in the door opening area
-                        if (ball.x > doorLeft && ball.x < doorRight && doorsOpen) {
-                            // Ball can pass through
-                        } else {
-                            // Calculate slant normal
-                            const isLeftSide = ball.x < centerX;
-                            const slopeAngle = Math.atan2(SLANT_HEIGHT, RESERVOIR_WIDTH / 2);
+                        const inDoorArea = ball.x > DOOR_HINGE_X_LEFT && ball.x < DOOR_HINGE_X_RIGHT;
 
-                            // Push ball up along normal
-                            ball.y = slantY - BALL_RADIUS;
+                        if (inDoorArea && doorsOpen && doorAngle > 0.3) {
+                            // Ball can pass through
+                        } else if (inDoorArea && (!doorsOpen || doorAngle < 0.3)) {
+                            // Doors closed - bounce off
+                            ball.y = slantY - ballRadius;
+                            ball.vy = -Math.abs(ball.vy) * BOUNCE_DAMPING;
+                        } else {
+                            // On the slanted surface - roll toward center
+                            const isLeftSide = ball.x < centerX;
+                            const slopeAngle = Math.atan2(SLANT_HEIGHT, RESERVOIR_WIDTH / 2 - DOOR_WIDTH);
+
+                            ball.y = slantY - ballRadius;
 
                             // Add velocity component along slope toward center
                             if (isLeftSide) {
-                                ball.vx += Math.sin(slopeAngle) * 0.3;
+                                ball.vx += Math.sin(slopeAngle) * 0.4;
                             } else {
-                                ball.vx -= Math.sin(slopeAngle) * 0.3;
+                                ball.vx -= Math.sin(slopeAngle) * 0.4;
                             }
                             ball.vy = -Math.abs(ball.vy) * BOUNCE_DAMPING * 0.3;
-                        }
-                    }
-
-                    // Door edges collision when doors are closing or partially open
-                    if (ball.y + BALL_RADIUS > topOfSlant - 5) {
-                        if (ball.x < doorLeft && ball.x + BALL_RADIUS > doorLeft - 5) {
-                            ball.x = doorLeft - BALL_RADIUS - 5;
-                        }
-                        if (ball.x > doorRight && ball.x - BALL_RADIUS < doorRight + 5) {
-                            ball.x = doorRight + BALL_RADIUS + 5;
                         }
                     }
                 } else {
@@ -403,71 +469,64 @@
                         const dx = ball.x - nail.x;
                         const dy = ball.y - nail.y;
                         const dist = Math.sqrt(dx * dx + dy * dy);
-                        const minDist = BALL_RADIUS + NAIL_RADIUS;
+                        const minDist = ballRadius + NAIL_RADIUS;
 
                         if (dist < minDist) {
-                            // Normalize
                             const nx = dx / dist;
                             const ny = dy / dist;
 
-                            // Separate
                             ball.x = nail.x + nx * minDist;
                             ball.y = nail.y + ny * minDist;
 
-                            // Reflect velocity
                             const dot = ball.vx * nx + ball.vy * ny;
                             ball.vx = (ball.vx - 2 * dot * nx) * BOUNCE_DAMPING;
                             ball.vy = (ball.vy - 2 * dot * ny) * BOUNCE_DAMPING;
 
-                            // Add randomness (equal probability left/right)
+                            // Equal probability left/right
                             ball.vx += (Math.random() < 0.5 ? -1 : 1) * 1.5;
                         }
                     }
 
                     // Nailboard walls
                     if (ball.y > NAILBOARD_TOP && ball.y < NAILBOARD_TOP + NAILBOARD_HEIGHT) {
-                        if (ball.x - BALL_RADIUS < NAILBOARD_X) {
-                            ball.x = NAILBOARD_X + BALL_RADIUS;
+                        if (ball.x - ballRadius < NAILBOARD_X) {
+                            ball.x = NAILBOARD_X + ballRadius;
                             ball.vx = -ball.vx * BOUNCE_DAMPING;
                         }
-                        if (ball.x + BALL_RADIUS > NAILBOARD_X + NAILBOARD_WIDTH) {
-                            ball.x = NAILBOARD_X + NAILBOARD_WIDTH - BALL_RADIUS;
+                        if (ball.x + ballRadius > NAILBOARD_X + NAILBOARD_WIDTH) {
+                            ball.x = NAILBOARD_X + NAILBOARD_WIDTH - ballRadius;
                             ball.vx = -ball.vx * BOUNCE_DAMPING;
                         }
                     }
 
                     // Bin collisions
                     if (ball.y > BIN_TOP) {
-                        // Determine which bin
                         const binIndex = Math.floor((ball.x - NAILBOARD_X) / BIN_WIDTH);
                         const clampedBinIndex = Math.max(0, Math.min(NUM_BINS - 1, binIndex));
 
-                        // Bin walls
                         const binLeft = NAILBOARD_X + clampedBinIndex * BIN_WIDTH;
                         const binRight = binLeft + BIN_WIDTH;
 
-                        if (ball.x - BALL_RADIUS < binLeft) {
-                            ball.x = binLeft + BALL_RADIUS;
+                        if (ball.x - ballRadius < binLeft) {
+                            ball.x = binLeft + ballRadius;
                             ball.vx = -ball.vx * BOUNCE_DAMPING;
                         }
-                        if (ball.x + BALL_RADIUS > binRight) {
-                            ball.x = binRight - BALL_RADIUS;
+                        if (ball.x + ballRadius > binRight) {
+                            ball.x = binRight - ballRadius;
                             ball.vx = -ball.vx * BOUNCE_DAMPING;
                         }
 
-                        // Bin bottom
-                        if (ball.y + BALL_RADIUS > BIN_TOP + BIN_HEIGHT) {
-                            ball.y = BIN_TOP + BIN_HEIGHT - BALL_RADIUS;
+                        if (ball.y + ballRadius > BIN_TOP + BIN_HEIGHT) {
+                            ball.y = BIN_TOP + BIN_HEIGHT - ballRadius;
                             ball.vy = -ball.vy * BOUNCE_DAMPING;
 
-                            // Check if settled
                             if (Math.abs(ball.vy) < 0.5 && Math.abs(ball.vx) < 0.5) {
                                 ball.inBin = true;
                                 ball.binIndex = clampedBinIndex;
                             }
                         }
 
-                        // Stack on other balls in same bin
+                        // Stack on other balls
                         for (const other of balls) {
                             if (other === ball) continue;
                             if (!other.inBin || other.binIndex !== clampedBinIndex) continue;
@@ -475,7 +534,7 @@
                             const dx = ball.x - other.x;
                             const dy = ball.y - other.y;
                             const dist = Math.sqrt(dx * dx + dy * dy);
-                            const minDist = BALL_RADIUS * 2;
+                            const minDist = ballRadius * 2;
 
                             if (dist < minDist && dist > 0) {
                                 const nx = dx / dist;
@@ -496,19 +555,20 @@
                         }
                     }
 
-                    // Funnel collision (guide balls after leaving reservoir)
-                    if (ball.y < NAILBOARD_TOP && ball.y > topOfSlant) {
-                        const funnelProgress = (ball.y - topOfSlant) / 40;
-                        const funnelWidth = DOOR_OPEN_MAX + 10 - funnelProgress * (DOOR_OPEN_MAX - 5);
-                        const funnelLeft = centerX - funnelWidth;
-                        const funnelRight = centerX + funnelWidth;
+                    // Funnel collision
+                    const funnelTop = bottomCenterY;
+                    if (ball.y < NAILBOARD_TOP && ball.y > funnelTop) {
+                        const funnelProgress = (ball.y - funnelTop) / 40;
+                        const funnelHalfWidth = (DOOR_WIDTH + 10) - funnelProgress * (DOOR_WIDTH - 5);
+                        const funnelLeft = centerX - funnelHalfWidth;
+                        const funnelRight = centerX + funnelHalfWidth;
 
-                        if (ball.x - BALL_RADIUS < funnelLeft) {
-                            ball.x = funnelLeft + BALL_RADIUS;
+                        if (ball.x - ballRadius < funnelLeft) {
+                            ball.x = funnelLeft + ballRadius;
                             ball.vx = Math.abs(ball.vx) * BOUNCE_DAMPING;
                         }
-                        if (ball.x + BALL_RADIUS > funnelRight) {
-                            ball.x = funnelRight - BALL_RADIUS;
+                        if (ball.x + ballRadius > funnelRight) {
+                            ball.x = funnelRight - ballRadius;
                             ball.vx = -Math.abs(ball.vx) * BOUNCE_DAMPING;
                         }
                     }
@@ -522,20 +582,18 @@
                     const dx = ball.x - other.x;
                     const dy = ball.y - other.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-                    const minDist = BALL_RADIUS * 2;
+                    const minDist = ballRadius * 2;
 
                     if (dist < minDist && dist > 0) {
                         const nx = dx / dist;
                         const ny = dy / dist;
 
-                        // Separate
                         const overlap = (minDist - dist) / 2;
                         ball.x += nx * overlap;
                         ball.y += ny * overlap;
                         other.x -= nx * overlap;
                         other.y -= ny * overlap;
 
-                        // Exchange velocity components
                         const dvx = ball.vx - other.vx;
                         const dvy = ball.vy - other.vy;
                         const dot = dvx * nx + dvy * ny;
@@ -557,9 +615,12 @@
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Update door animation
-            if (doorsOpen && doorOpenAmount < DOOR_OPEN_MAX) {
-                doorOpenAmount += 0.3;
+            // Update door animation (hinged swing)
+            if (doorsOpen && doorAngle < DOOR_ANGLE_MAX) {
+                doorAngle += 0.02;
+            } else if (!doorsOpen && doorAngle > 0) {
+                doorAngle -= 0.02;
+                if (doorAngle < 0) doorAngle = 0;
             }
 
             updateBalls();
@@ -580,17 +641,24 @@
                 dropButton.disabled = true;
                 dropButton.textContent = 'Dropping...';
 
-                // Re-enable after all balls have settled
                 setTimeout(() => {
                     dropButton.disabled = false;
                     dropButton.textContent = 'Reset';
                 }, 5000);
             } else {
-                // Reset
                 doorsOpen = false;
-                doorOpenAmount = 0;
+                doorAngle = 0;
                 initBalls();
                 dropButton.textContent = 'Drop Balls';
+            }
+        });
+
+        // Event listener for ball count slider
+        ballSlider.addEventListener('input', (e) => {
+            numBalls = parseInt(e.target.value);
+            ballSliderValue.textContent = numBalls;
+            if (!doorsOpen) {
+                initBalls();
             }
         });
 
