@@ -119,7 +119,7 @@
             <button id="dropButton">Drop Balls</button>
             <div class="slider-container">
                 <label>Number of Balls: <span id="ballSliderValue" class="slider-value">150</span></label>
-                <input type="range" id="ballSlider" min="1" max="1000" value="150">
+                <input type="range" id="ballSlider" min="1" max="800" value="150">
             </div>
             <div class="stats">
                 <h3>Statistics</h3>
@@ -175,40 +175,32 @@
         let doorAngle = 0; // Angle of hinged doors (0 = closed, Math.PI/2 = fully open)
         const DOOR_ANGLE_MAX = Math.PI / 2.5;
         let numBalls = 150;
-        let ballRadius = 6;
+        const ballRadius = 3; // Fixed 6px diameter
 
-        // Calculate ball radius based on number of balls
-        function calculateBallRadius(count) {
-            // Scale radius from 6 (few balls) down to 2 (1000 balls)
-            if (count <= 50) return 6;
-            if (count <= 150) return 5;
-            if (count <= 300) return 4;
-            if (count <= 500) return 3;
-            return 2;
-        }
+        // Calculate max balls that fit in reservoir
+        const BALL_DIAMETER = ballRadius * 2;
+        const reservoirUsableWidth = RESERVOIR_WIDTH - 10;
+        const reservoirUsableHeight = RESERVOIR_HEIGHT - SLANT_HEIGHT - 5;
+        const maxCols = Math.floor(reservoirUsableWidth / BALL_DIAMETER);
+        const maxRows = Math.floor(reservoirUsableHeight / BALL_DIAMETER);
+        const MAX_BALLS = maxCols * maxRows;
 
         // Initialize balls in reservoir
         function initBalls() {
             balls = [];
-            ballRadius = calculateBallRadius(numBalls);
-
-            const reservoirUsableHeight = RESERVOIR_HEIGHT - SLANT_HEIGHT - 10;
-            const reservoirUsableWidth = RESERVOIR_WIDTH - 20;
 
             // Calculate grid layout
-            const ballDiameter = ballRadius * 2 + 1;
-            const cols = Math.floor(reservoirUsableWidth / ballDiameter);
-            const rows = Math.ceil(numBalls / cols);
+            const cols = maxCols;
 
             for (let i = 0; i < numBalls; i++) {
                 const col = i % cols;
                 const row = Math.floor(i / cols);
-                const x = RESERVOIR_X + 10 + ballRadius + col * ballDiameter + (Math.random() - 0.5) * 2;
-                const y = RESERVOIR_TOP + 10 + ballRadius + row * ballDiameter + (Math.random() - 0.5) * 2;
+                const x = RESERVOIR_X + 5 + ballRadius + col * BALL_DIAMETER + (Math.random() - 0.5) * 1;
+                const y = RESERVOIR_TOP + 5 + ballRadius + row * BALL_DIAMETER + (Math.random() - 0.5) * 1;
 
                 balls.push({
                     x: x,
-                    y: Math.min(y, RESERVOIR_TOP + reservoirUsableHeight),
+                    y: y,
                     vx: (Math.random() - 0.5) * 0.5,
                     vy: 0,
                     inReservoir: true,
@@ -630,6 +622,7 @@
         });
 
         // Initialize and start
+        ballSlider.max = MAX_BALLS;
         initBalls();
         initNails();
         animate();
