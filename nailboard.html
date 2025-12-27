@@ -194,6 +194,7 @@
                     vx: 0,
                     vy: 0,
                     inReservoir: true,
+                    resting: false,
                     inBin: false
                 });
             }
@@ -333,8 +334,16 @@
 
         // Physics update
         function updatePhysics() {
+            // Wake up resting balls when doors open
+            if (doorsOpen) {
+                for (const ball of balls) {
+                    if (ball.resting) ball.resting = false;
+                }
+            }
+
             for (const ball of balls) {
                 if (ball.inBin) continue;
+                if (ball.resting) continue; // Skip physics for resting balls
 
                 // Apply gravity
                 ball.vy += GRAVITY;
@@ -344,6 +353,8 @@
                 // Update position
                 ball.x += ball.vx;
                 ball.y += ball.vy;
+
+                let onSurface = false;
 
                 if (ball.inReservoir) {
                     // Wall collisions
@@ -369,17 +380,25 @@
                             // Exit reservoir
                             ball.inReservoir = false;
                         } else {
-                            // Bounce on slant
+                            // Rest on slant
                             ball.y = slantY - BALL_RADIUS;
+                            onSurface = true;
 
-                            // Roll toward center
+                            // Roll toward center with friction
                             if (ball.x < CENTER_X) {
-                                ball.vx += 0.1;
-                            } else {
-                                ball.vx -= 0.1;
+                                ball.vx += 0.08;
+                            } else if (ball.x > CENTER_X) {
+                                ball.vx -= 0.08;
                             }
-                            ball.vy *= -BOUNCE * 0.5;
+                            ball.vy = 0;
                         }
+                    }
+
+                    // Check if ball should rest (on surface with low velocity)
+                    if (onSurface && Math.abs(ball.vx) < 0.2 && Math.abs(ball.vy) < 0.2) {
+                        ball.vx = 0;
+                        ball.vy = 0;
+                        ball.resting = true;
                     }
                 } else {
                     // Nail collisions
@@ -464,9 +483,9 @@
                     }
                 }
 
-                // Ball-to-ball collisions (for active balls)
+                // Ball-to-ball collisions (for active balls only)
                 for (const other of balls) {
-                    if (other === ball || other.inBin) continue;
+                    if (other === ball || other.inBin || other.resting) continue;
                     const dx = ball.x - other.x;
                     const dy = ball.y - other.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
