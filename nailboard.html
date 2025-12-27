@@ -837,13 +837,11 @@
             let ballsInBinArea = 0;
 
             for (const ball of balls) {
-                // Count balls that have left reservoir and are in/past the bin area
-                if (!ball.inReservoir) {
+                // Only count balls that are actually in the bin area (below BIN_TOP)
+                if (!ball.inReservoir && ball.y > BIN_TOP) {
                     ballsInBinArea++;
-                    if (ball.y > BIN_TOP) {
-                        const idx = getBinIndex(ball.x);
-                        binCounts[idx]++;
-                    }
+                    const idx = getBinIndex(ball.x);
+                    binCounts[idx]++;
                 }
             }
 
