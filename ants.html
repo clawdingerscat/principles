@@ -41,13 +41,25 @@
         <input type="range" id="fillPercentage" min="0" max="100" value="30"><br>
         <label for="noiseLevel">Noise Level:</label>
         <input type="range" id="noiseLevel" min="0" max="100" value="0"><br>
-        <input type="checkbox" id="showGrid"><label for="showGrid">Show Grid</label>
+        <input type="checkbox" id="showGrid"><label for="showGrid">Show Grid</label><br>
+        <select id="displayMode">
+            <option value="arrows">B/W Arrows</option>
+            <option value="balls">Color Balls</option>
+        </select>
     </div>
     <div id="grid"></div>
     <script>
         let isRunning = false;
         let fillPercentage = 30;
         let noiseLevel = 0;
+        let displayMode = 'arrows';
+
+        const colorBalls = {
+            '→': '\u{1F7E1}', // yellow
+            '↓': '\u{1F534}', // red
+            '←': '\u{1F535}', // blue
+            '↑': '\u{1F7E2}'  // green
+        };
 
         document.addEventListener('DOMContentLoaded', () => {
             const startStopButton = document.getElementById('startStop');
@@ -80,6 +92,12 @@
             showGridCheckbox.addEventListener('change', (e) => {
                 const gridElement = document.getElementById('grid');
                 gridElement.classList.toggle('show-lines', e.target.checked);
+            });
+
+            const displayModeSelect = document.getElementById('displayMode');
+            displayModeSelect.addEventListener('change', (e) => {
+                displayMode = e.target.value;
+                renderGrid();
             });
 
             // Initialize the simulation
@@ -118,7 +136,12 @@
                 for (let j = 0; j < gridSize; j++) {
                     const cell = document.createElement('div');
                     cell.className = 'cell';
-                    cell.textContent = grid[i][j];
+                    const direction = grid[i][j];
+                    if (displayMode === 'balls' && colorBalls[direction]) {
+                        cell.textContent = colorBalls[direction];
+                    } else {
+                        cell.textContent = direction;
+                    }
                     gridElement.appendChild(cell);
                 }
             }
