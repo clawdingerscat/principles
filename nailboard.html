@@ -123,22 +123,27 @@
             </div>
             <h3>Physics</h3>
             <div class="slider-container">
-                <label>Gravity: <span id="gravityValue" class="slider-value">0.15</span></label>
-                <input type="range" id="gravitySlider" min="0.01" max="0.5" step="0.01" value="0.15">
+                <label>Gravity: <span id="gravityValue" class="slider-value">0.35</span></label>
+                <input type="range" id="gravitySlider" min="0.01" max="0.5" step="0.01" value="0.35">
             </div>
             <div class="slider-container">
-                <label>Friction: <span id="frictionValue" class="slider-value">0.20</span></label>
-                <input type="range" id="frictionSlider" min="0" max="1" step="0.05" value="0.2">
+                <label>Friction: <span id="frictionValue" class="slider-value">0.80</span></label>
+                <input type="range" id="frictionSlider" min="0" max="1" step="0.05" value="0.8">
             </div>
             <div class="slider-container">
-                <label>Bounce: <span id="bounceValue" class="slider-value">0.6</span></label>
-                <input type="range" id="bounceSlider" min="0.1" max="0.9" step="0.05" value="0.6">
+                <label>Bounce: <span id="bounceValue" class="slider-value">0.8</span></label>
+                <input type="range" id="bounceSlider" min="0.1" max="0.9" step="0.05" value="0.8">
             </div>
             <div class="stats">
                 <h3>Statistics</h3>
                 <div>Balls: <span id="ballCount">0</span></div>
                 <div>In bins: <span id="binCount">0</span></div>
                 <div>Beyond bins: <span id="beyondCount">0</span></div>
+                <div style="margin-top: 10px; border-top: 1px solid #4a7ab0; padding-top: 10px;">
+                    <div>Left (1-5): <span id="leftPct">0%</span></div>
+                    <div>Center (6-8): <span id="centerPct">0%</span></div>
+                    <div>Right (9-13): <span id="rightPct">0%</span></div>
+                </div>
             </div>
         </div>
     </div>
@@ -149,9 +154,9 @@
         // ======================
         const Physics = {
             // Configuration
-            gravity: 0.15,
-            friction: 0.98,  // Internal value: 1.0 = no friction, 0.9 = max friction
-            bounce: 0.6,
+            gravity: 0.35,
+            friction: 0.92,  // Internal value: 1.0 = no friction, 0.9 = max friction (slider 0.8 -> 0.92)
+            bounce: 0.8,
 
             // Vector operations
             distance(x1, y1, x2, y2) {
@@ -325,6 +330,9 @@
         const ballCountSpan = document.getElementById('ballCount');
         const binCountSpan = document.getElementById('binCount');
         const beyondCountSpan = document.getElementById('beyondCount');
+        const leftPctSpan = document.getElementById('leftPct');
+        const centerPctSpan = document.getElementById('centerPct');
+        const rightPctSpan = document.getElementById('rightPct');
         const ballSlider = document.getElementById('ballSlider');
         const ballSliderValue = document.getElementById('ballSliderValue');
         const gravitySlider = document.getElementById('gravitySlider');
@@ -877,9 +885,26 @@
                 }
             }
 
+            // Calculate left/center/right percentages
+            // Left bins 1-5 (UI) = indices 0-4 (internal)
+            // Center bins 6-8 (UI) = indices 5-7 (internal)
+            // Right bins 9-13 (UI) = indices 8-12 (internal)
+            let leftCount = 0, centerCount = 0, rightCount = 0;
+            for (let i = 0; i <= 4; i++) leftCount += binCounts[i];
+            for (let i = 5; i <= 7; i++) centerCount += binCounts[i];
+            for (let i = 8; i <= 12; i++) rightCount += binCounts[i];
+
+            const totalInBins = ballsInBinArea;
+            const leftPct = totalInBins > 0 ? (leftCount / totalInBins * 100).toFixed(1) : 0;
+            const centerPct = totalInBins > 0 ? (centerCount / totalInBins * 100).toFixed(1) : 0;
+            const rightPct = totalInBins > 0 ? (rightCount / totalInBins * 100).toFixed(1) : 0;
+
             ballCountSpan.textContent = balls.length;
             binCountSpan.textContent = ballsInBinArea;
             beyondCountSpan.textContent = ballsBeyondBins;
+            leftPctSpan.textContent = leftPct + '%';
+            centerPctSpan.textContent = centerPct + '%';
+            rightPctSpan.textContent = rightPct + '%';
         }
 
         // ======================
