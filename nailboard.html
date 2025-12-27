@@ -130,6 +130,181 @@
     </div>
 
     <script>
+        // ======================
+        // Minimalist 2D Physics Engine
+        // ======================
+        const Physics = {
+            // Configuration
+            gravity: 0.15,
+            friction: 0.98,
+            bounce: 0.4,
+
+            // Vector operations
+            distance(x1, y1, x2, y2) {
+                const dx = x1 - x2;
+                const dy = y1 - y2;
+                return Math.sqrt(dx * dx + dy * dy);
+            },
+
+            normalize(dx, dy) {
+                const len = Math.sqrt(dx * dx + dy * dy);
+                return len > 0 ? { x: dx / len, y: dy / len } : { x: 0, y: 0 };
+            },
+
+            dot(vx, vy, nx, ny) {
+                return vx * nx + vy * ny;
+            },
+
+            // Apply gravity to a ball
+            applyGravity(ball) {
+                ball.vy += this.gravity;
+            },
+
+            // Apply friction to a ball
+            applyFriction(ball) {
+                ball.vx *= this.friction;
+                ball.vy *= this.friction;
+            },
+
+            // Integrate position from velocity
+            integrate(ball) {
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+            },
+
+            // Constrain ball within rectangular bounds, returns which sides were hit
+            constrainToRect(ball, radius, left, top, right, bottom) {
+                const hits = { left: false, right: false, top: false, bottom: false };
+
+                if (ball.x - radius < left) {
+                    ball.x = left + radius;
+                    ball.vx *= -this.bounce;
+                    hits.left = true;
+                }
+                if (ball.x + radius > right) {
+                    ball.x = right - radius;
+                    ball.vx *= -this.bounce;
+                    hits.right = true;
+                }
+                if (ball.y - radius < top) {
+                    ball.y = top + radius;
+                    ball.vy *= -this.bounce;
+                    hits.top = true;
+                }
+                if (ball.y + radius > bottom) {
+                    ball.y = bottom - radius;
+                    ball.vy *= -this.bounce;
+                    hits.bottom = true;
+                }
+
+                return hits;
+            },
+
+            // Resolve collision between ball and static circle (nail)
+            collideWithCircle(ball, ballRadius, cx, cy, circleRadius, options = {}) {
+                const dx = ball.x - cx;
+                const dy = ball.y - cy;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const minDist = ballRadius + circleRadius;
+
+                if (dist < minDist && dist > 0) {
+                    const n = this.normalize(dx, dy);
+
+                    // Push ball out
+                    ball.x = cx + n.x * minDist;
+                    ball.y = cy + n.y * minDist;
+
+                    // Reflect velocity
+                    const dot = this.dot(ball.vx, ball.vy, n.x, n.y);
+                    ball.vx -= 2 * dot * n.x;
+                    ball.vy -= 2 * dot * n.y;
+                    ball.vx *= this.bounce;
+                    ball.vy *= this.bounce;
+
+                    // Optional random nudge
+                    if (options.randomNudge) {
+                        ball.vx += (Math.random() < 0.5 ? -1 : 1) * options.randomNudge;
+                    }
+
+                    return true;
+                }
+                return false;
+            },
+
+            // Resolve collision between two balls
+            collideBalls(ball1, ball2, radius, options = {}) {
+                const dx = ball1.x - ball2.x;
+                const dy = ball1.y - ball2.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const minDist = radius * 2;
+
+                if (dist < minDist && dist > 0) {
+                    const n = this.normalize(dx, dy);
+                    const overlap = minDist - dist;
+
+                    if (options.ball2Static) {
+                        // Ball2 is static - only move ball1
+                        ball1.x += n.x * overlap;
+                        ball1.y += n.y * overlap;
+
+                        const dot = this.dot(ball1.vx, ball1.vy, n.x, n.y);
+                        ball1.vx -= dot * n.x * 1.5;
+                        ball1.vy -= dot * n.y * 1.5;
+                        ball1.vx *= this.bounce;
+                        ball1.vy *= this.bounce;
+                    } else {
+                        // Both balls movable - share separation
+                        ball1.x += n.x * overlap * 0.5;
+                        ball1.y += n.y * overlap * 0.5;
+                        ball2.x -= n.x * overlap * 0.5;
+                        ball2.y -= n.y * overlap * 0.5;
+
+                        // Velocity exchange
+                        const dvx = ball1.vx - ball2.vx;
+                        const dvy = ball1.vy - ball2.vy;
+                        const dot = this.dot(dvx, dvy, n.x, n.y);
+
+                        if (dot > 0 || !options.onlyApproaching) {
+                            ball1.vx -= dot * n.x * 0.5;
+                            ball1.vy -= dot * n.y * 0.5;
+                            ball2.vx += dot * n.x * 0.5;
+                            ball2.vy += dot * n.y * 0.5;
+                        }
+                    }
+
+                    return true;
+                }
+                return false;
+            },
+
+            // Check if ball is nearly stopped
+            isSettled(ball, threshold = 0.1) {
+                return Math.abs(ball.vx) < threshold && Math.abs(ball.vy) < threshold;
+            },
+
+            // Stop ball completely
+            stop(ball) {
+                ball.vx = 0;
+                ball.vy = 0;
+            },
+
+            // Check if ball1 has a supporting ball below it
+            hasSupport(ball, allBalls, radius, margin = 0.2) {
+                for (const other of allBalls) {
+                    if (other === ball) continue;
+                    const dist = this.distance(ball.x, ball.y, other.x, other.y);
+                    const dy = ball.y - other.y;
+                    if (dist < radius * 2 * (1 + margin) && dy < 0) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+
+        // ======================
+        // Simulation Setup
+        // ======================
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const dropButton = document.getElementById('dropButton');
@@ -141,9 +316,6 @@
         // Configuration
         const NAIL_RADIUS = 8;
         const BALL_RADIUS = 5;
-        const GRAVITY = 0.15;
-        const BOUNCE = 0.4;
-        const FRICTION = 0.98;
         const NUM_ROWS = 10;
         const NUM_BINS = 11;
 
@@ -179,7 +351,9 @@
         const DOOR_MAX_ANGLE = Math.PI / 2;
         let numBalls = 100;
 
-        // Initialize balls in a grid at top of reservoir
+        // ======================
+        // Initialization
+        // ======================
         function initBalls() {
             balls = [];
             const spacing = BALL_RADIUS * 2.2;
@@ -200,14 +374,13 @@
             }
         }
 
-        // Initialize nails - first row has nail in center
         function initNails() {
             nails = [];
             const rowSpacing = NAILBOARD_HEIGHT / (NUM_ROWS + 1);
 
             for (let row = 0; row < NUM_ROWS; row++) {
                 const y = NAILBOARD_TOP + rowSpacing * (row + 1);
-                const hasCenter = row % 2 === 0; // First row (0) has center nail
+                const hasCenter = row % 2 === 0;
                 const numNails = hasCenter ? 11 : 10;
                 const offset = hasCenter ? BIN_WIDTH / 2 : BIN_WIDTH;
 
@@ -220,8 +393,9 @@
             }
         }
 
-        // Get slant Y position (slopes down toward center)
-        // Center is lowest (RESERVOIR_BOTTOM), edges are highest (RESERVOIR_BOTTOM - SLANT_HEIGHT)
+        // ======================
+        // Slant Geometry
+        // ======================
         function getSlantY(x) {
             const distFromCenter = Math.abs(x - CENTER_X);
             const maxDist = RESERVOIR_WIDTH / 2;
@@ -229,14 +403,15 @@
             return RESERVOIR_BOTTOM - SLANT_HEIGHT * ratio;
         }
 
-        // Draw reservoir
+        // ======================
+        // Drawing Functions
+        // ======================
         function drawReservoir() {
             ctx.strokeStyle = '#4a7ab0';
             ctx.lineWidth = 3;
 
-            const edgeY = RESERVOIR_BOTTOM - SLANT_HEIGHT; // Edges are higher
+            const edgeY = RESERVOIR_BOTTOM - SLANT_HEIGHT;
 
-            // Walls - go down to the edge of the slant
             ctx.beginPath();
             ctx.moveTo(RESERVOIR_X, RESERVOIR_TOP);
             ctx.lineTo(RESERVOIR_X, edgeY);
@@ -247,13 +422,11 @@
             ctx.lineTo(RESERVOIR_X + RESERVOIR_WIDTH, edgeY);
             ctx.stroke();
 
-            // Top
             ctx.beginPath();
             ctx.moveTo(RESERVOIR_X, RESERVOIR_TOP);
             ctx.lineTo(RESERVOIR_X + RESERVOIR_WIDTH, RESERVOIR_TOP);
             ctx.stroke();
 
-            // Slanted bottom - slopes DOWN toward center (edges high, center low)
             ctx.beginPath();
             ctx.moveTo(RESERVOIR_X, edgeY);
             ctx.lineTo(DOOR_LEFT, RESERVOIR_BOTTOM);
@@ -264,24 +437,20 @@
             ctx.lineTo(DOOR_RIGHT, RESERVOIR_BOTTOM);
             ctx.stroke();
 
-            // Doors
             ctx.lineWidth = 4;
             ctx.strokeStyle = '#6a9ad0';
 
             const doorLen = DOOR_WIDTH;
-            // Left door
             ctx.beginPath();
             ctx.moveTo(DOOR_LEFT, RESERVOIR_BOTTOM);
             ctx.lineTo(DOOR_LEFT + Math.cos(doorAngle) * doorLen, RESERVOIR_BOTTOM + Math.sin(doorAngle) * doorLen);
             ctx.stroke();
 
-            // Right door
             ctx.beginPath();
             ctx.moveTo(DOOR_RIGHT, RESERVOIR_BOTTOM);
             ctx.lineTo(DOOR_RIGHT - Math.cos(doorAngle) * doorLen, RESERVOIR_BOTTOM + Math.sin(doorAngle) * doorLen);
             ctx.stroke();
 
-            // Hinges
             ctx.fillStyle = '#8ab4e8';
             ctx.beginPath();
             ctx.arc(DOOR_LEFT, RESERVOIR_BOTTOM, 4, 0, Math.PI * 2);
@@ -289,7 +458,6 @@
             ctx.fill();
         }
 
-        // Draw nails
         function drawNails() {
             ctx.fillStyle = '#c0c0c0';
             for (const nail of nails) {
@@ -299,7 +467,6 @@
             }
         }
 
-        // Draw bins
         function drawBins() {
             ctx.strokeStyle = '#4a7ab0';
             ctx.lineWidth = 2;
@@ -317,7 +484,6 @@
             ctx.stroke();
         }
 
-        // Draw balls
         function drawBalls() {
             for (const ball of balls) {
                 const gradient = ctx.createRadialGradient(
@@ -333,39 +499,32 @@
             }
         }
 
-        // Physics update
-        function updatePhysics() {
-            // Check if resting balls should wake up
+        // ======================
+        // Physics Update
+        // ======================
+        function isTouchingRestingBallTowardCenter(ball) {
+            for (const other of balls) {
+                if (other === ball || !other.resting || other.inBin) continue;
+                const dist = Physics.distance(ball.x, ball.y, other.x, other.y);
+
+                if (dist < BALL_RADIUS * 2.3) {
+                    const otherTowardCenter = (ball.x < CENTER_X && other.x > ball.x) ||
+                                               (ball.x > CENTER_X && other.x < ball.x);
+                    if (otherTowardCenter) return true;
+                }
+            }
+            return false;
+        }
+
+        function updateReservoirBallWakeup() {
             for (const ball of balls) {
                 if (!ball.resting || ball.inBin) continue;
 
-                // Check if ball is on the slant
                 const slantY = getSlantY(ball.x);
                 const onSlant = ball.y + BALL_RADIUS >= slantY - 1;
                 const nearCenter = Math.abs(ball.x - CENTER_X) < BALL_RADIUS * 3;
 
-                // Check if touching a resting ball toward center
-                let touchingRestingTowardCenter = false;
-                for (const other of balls) {
-                    if (other === ball || !other.resting || other.inBin) continue;
-                    const dx = ball.x - other.x;
-                    const dy = ball.y - other.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-
-                    if (dist < BALL_RADIUS * 2.3) {
-                        const otherTowardCenter = (ball.x < CENTER_X && other.x > ball.x) ||
-                                                   (ball.x > CENTER_X && other.x < ball.x);
-                        if (otherTowardCenter) {
-                            touchingRestingTowardCenter = true;
-                            break;
-                        }
-                    }
-                }
-
-                // Wake up if:
-                // - On slant but not near center AND not behind a resting ball
-                // - Doors are open (everyone evacuates)
-                if (onSlant && !nearCenter && !touchingRestingTowardCenter) {
+                if (onSlant && !nearCenter && !isTouchingRestingBallTowardCenter(ball)) {
                     ball.resting = false;
                 }
 
@@ -373,266 +532,148 @@
                     ball.resting = false;
                 }
             }
+        }
+
+        function updateBinBallWakeup() {
+            const binBottom = BIN_TOP + BIN_HEIGHT;
 
             for (const ball of balls) {
-                if (ball.resting && ball.inReservoir) continue; // Only skip reservoir resting balls
+                if (!ball.inBin) continue;
 
-                // Wake up bin balls that aren't supported
-                if (ball.inBin) {
-                    const binBottom = BIN_TOP + BIN_HEIGHT;
-                    const onFloor = ball.y + BALL_RADIUS >= binBottom - 1;
-
-                    if (!onFloor) {
-                        // Check if supported by other balls
-                        let supported = false;
-                        for (const other of balls) {
-                            if (other === ball) continue;
-                            const dx = ball.x - other.x;
-                            const dy = ball.y - other.y;
-                            const dist = Math.sqrt(dx * dx + dy * dy);
-                            // Supported if there's a ball below and close
-                            if (dist < BALL_RADIUS * 2.2 && dy < 0) {
-                                supported = true;
-                                break;
-                            }
-                        }
-                        if (!supported) {
-                            ball.inBin = false; // Wake up and fall
-                        }
-                    }
+                const onFloor = ball.y + BALL_RADIUS >= binBottom - 1;
+                if (!onFloor && !Physics.hasSupport(ball, balls, BALL_RADIUS)) {
+                    ball.inBin = false;
                 }
+            }
+        }
 
-                if (ball.inBin) continue; // Skip settled bin balls
+        function updateReservoirPhysics(ball) {
+            // Wall collisions (top and sides only)
+            Physics.constrainToRect(ball, BALL_RADIUS,
+                RESERVOIR_X, RESERVOIR_TOP,
+                RESERVOIR_X + RESERVOIR_WIDTH, Infinity);
 
-                // Apply gravity
-                ball.vy += GRAVITY;
-                ball.vx *= FRICTION;
-                ball.vy *= FRICTION;
+            // Slant collision
+            const slantY = getSlantY(ball.x);
+            let onSurface = false;
 
-                // Update position
-                ball.x += ball.vx;
-                ball.y += ball.vy;
+            if (ball.y + BALL_RADIUS > slantY) {
+                const inDoorZone = ball.x > DOOR_LEFT && ball.x < DOOR_RIGHT;
 
-                let onSurface = false;
-
-                if (ball.inReservoir) {
-                    // Wall collisions
-                    if (ball.x - BALL_RADIUS < RESERVOIR_X) {
-                        ball.x = RESERVOIR_X + BALL_RADIUS;
-                        ball.vx *= -BOUNCE;
-                    }
-                    if (ball.x + BALL_RADIUS > RESERVOIR_X + RESERVOIR_WIDTH) {
-                        ball.x = RESERVOIR_X + RESERVOIR_WIDTH - BALL_RADIUS;
-                        ball.vx *= -BOUNCE;
-                    }
-                    if (ball.y - BALL_RADIUS < RESERVOIR_TOP) {
-                        ball.y = RESERVOIR_TOP + BALL_RADIUS;
-                        ball.vy *= -BOUNCE;
-                    }
-
-                    // Slant collision
-                    const slantY = getSlantY(ball.x);
-                    if (ball.y + BALL_RADIUS > slantY) {
-                        const inDoorZone = ball.x > DOOR_LEFT && ball.x < DOOR_RIGHT;
-
-                        if (inDoorZone && doorsOpen && doorAngle > 0.5) {
-                            // Exit reservoir
-                            ball.inReservoir = false;
-                        } else {
-                            // Rest on slant
-                            ball.y = slantY - BALL_RADIUS;
-                            onSurface = true;
-
-                            // Roll toward center with friction
-                            if (ball.x < CENTER_X) {
-                                ball.vx += 0.12;
-                            } else if (ball.x > CENTER_X) {
-                                ball.vx -= 0.12;
-                            }
-                            ball.vy = 0;
-                        }
-                    }
-
-                    // Check if ball should rest
-                    // Can rest if: near center OR touching a resting ball toward center
-                    const nearCenter = Math.abs(ball.x - CENTER_X) < BALL_RADIUS * 3;
-                    let touchingRestingTowardCenter = false;
-
-                    if (!nearCenter) {
-                        for (const other of balls) {
-                            if (other === ball || !other.resting || other.inBin) continue;
-                            const odx = ball.x - other.x;
-                            const ody = ball.y - other.y;
-                            const odist = Math.sqrt(odx * odx + ody * ody);
-
-                            // Check if touching (within 2.2 radii) and other is toward center
-                            if (odist < BALL_RADIUS * 2.2) {
-                                const otherTowardCenter = (ball.x < CENTER_X && other.x > ball.x) ||
-                                                          (ball.x > CENTER_X && other.x < ball.x);
-                                if (otherTowardCenter) {
-                                    touchingRestingTowardCenter = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (onSurface && (nearCenter || touchingRestingTowardCenter) &&
-                        Math.abs(ball.vx) < 0.3 && Math.abs(ball.vy) < 0.3) {
-                        ball.vx = 0;
-                        ball.vy = 0;
-                        ball.resting = true;
-                    }
+                if (inDoorZone && doorsOpen && doorAngle > 0.5) {
+                    ball.inReservoir = false;
                 } else {
-                    // Nail collisions
-                    for (const nail of nails) {
-                        const dx = ball.x - nail.x;
-                        const dy = ball.y - nail.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        const minDist = BALL_RADIUS + NAIL_RADIUS;
+                    ball.y = slantY - BALL_RADIUS;
+                    onSurface = true;
 
-                        if (dist < minDist && dist > 0) {
-                            // Push ball out
-                            const nx = dx / dist;
-                            const ny = dy / dist;
-                            ball.x = nail.x + nx * minDist;
-                            ball.y = nail.y + ny * minDist;
-
-                            // Reflect velocity
-                            const dot = ball.vx * nx + ball.vy * ny;
-                            ball.vx -= 2 * dot * nx;
-                            ball.vy -= 2 * dot * ny;
-                            ball.vx *= BOUNCE;
-                            ball.vy *= BOUNCE;
-
-                            // Random left/right nudge
-                            ball.vx += (Math.random() < 0.5 ? -1 : 1) * 1.5;
-                        }
+                    // Roll toward center
+                    const rollForce = 0.12;
+                    if (ball.x < CENTER_X) {
+                        ball.vx += rollForce;
+                    } else if (ball.x > CENTER_X) {
+                        ball.vx -= rollForce;
                     }
+                    ball.vy = 0;
+                }
+            }
 
-                    // Side walls in nail area
-                    if (ball.x - BALL_RADIUS < NAILBOARD_X) {
-                        ball.x = NAILBOARD_X + BALL_RADIUS;
-                        ball.vx *= -BOUNCE;
-                    }
-                    if (ball.x + BALL_RADIUS > NAILBOARD_X + NAILBOARD_WIDTH) {
-                        ball.x = NAILBOARD_X + NAILBOARD_WIDTH - BALL_RADIUS;
-                        ball.vx *= -BOUNCE;
-                    }
+            // Check if should rest
+            if (onSurface) {
+                const nearCenter = Math.abs(ball.x - CENTER_X) < BALL_RADIUS * 3;
+                const canRest = nearCenter || isTouchingRestingBallTowardCenter(ball);
 
-                    // Bin collisions
+                if (canRest && Physics.isSettled(ball, 0.3)) {
+                    Physics.stop(ball);
+                    ball.resting = true;
+                }
+            }
+        }
+
+        function updateNailboardPhysics(ball) {
+            // Nail collisions
+            for (const nail of nails) {
+                Physics.collideWithCircle(ball, BALL_RADIUS, nail.x, nail.y, NAIL_RADIUS, {
+                    randomNudge: 1.5
+                });
+            }
+
+            // Side walls
+            if (ball.x - BALL_RADIUS < NAILBOARD_X) {
+                ball.x = NAILBOARD_X + BALL_RADIUS;
+                ball.vx *= -Physics.bounce;
+            }
+            if (ball.x + BALL_RADIUS > NAILBOARD_X + NAILBOARD_WIDTH) {
+                ball.x = NAILBOARD_X + NAILBOARD_WIDTH - BALL_RADIUS;
+                ball.vx *= -Physics.bounce;
+            }
+        }
+
+        function updateBinPhysics(ball) {
+            const binIdx = Math.floor((ball.x - NAILBOARD_X) / BIN_WIDTH);
+            const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
+            const binLeft = NAILBOARD_X + idx * BIN_WIDTH;
+            const binRight = binLeft + BIN_WIDTH;
+            const binBottom = BIN_TOP + BIN_HEIGHT;
+
+            // Bin boundaries
+            Physics.constrainToRect(ball, BALL_RADIUS, binLeft, -Infinity, binRight, binBottom);
+
+            // Collide with other balls in bin
+            for (const other of balls) {
+                if (other === ball || other.inReservoir) continue;
+                Physics.collideBalls(ball, other, BALL_RADIUS, { onlyApproaching: true });
+            }
+
+            // Re-constrain after ball collisions
+            Physics.constrainToRect(ball, BALL_RADIUS, binLeft, -Infinity, binRight, binBottom);
+
+            // Settle in bin
+            if (Physics.isSettled(ball, 0.1)) {
+                ball.inBin = true;
+                Physics.stop(ball);
+            }
+        }
+
+        function updateBallToBallCollisions(ball) {
+            for (const other of balls) {
+                if (other === ball || other.inBin) continue;
+
+                Physics.collideBalls(ball, other, BALL_RADIUS, {
+                    ball2Static: other.resting
+                });
+            }
+        }
+
+        function updatePhysics() {
+            // Wake up resting balls if needed
+            updateReservoirBallWakeup();
+            updateBinBallWakeup();
+
+            // Update each ball
+            for (const ball of balls) {
+                // Skip resting reservoir balls and settled bin balls
+                if (ball.resting && ball.inReservoir) continue;
+                if (ball.inBin) continue;
+
+                // Core physics
+                Physics.applyGravity(ball);
+                Physics.applyFriction(ball);
+                Physics.integrate(ball);
+
+                // Zone-specific physics
+                if (ball.inReservoir) {
+                    updateReservoirPhysics(ball);
+                } else {
+                    updateNailboardPhysics(ball);
+
                     if (ball.y > BIN_TOP) {
-                        const binIdx = Math.floor((ball.x - NAILBOARD_X) / BIN_WIDTH);
-                        const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
-                        const binLeft = NAILBOARD_X + idx * BIN_WIDTH;
-                        const binRight = binLeft + BIN_WIDTH;
-                        const binBottom = BIN_TOP + BIN_HEIGHT;
-
-                        // Bin walls
-                        if (ball.x - BALL_RADIUS < binLeft) {
-                            ball.x = binLeft + BALL_RADIUS;
-                            ball.vx *= -BOUNCE;
-                        }
-                        if (ball.x + BALL_RADIUS > binRight) {
-                            ball.x = binRight - BALL_RADIUS;
-                            ball.vx *= -BOUNCE;
-                        }
-
-                        // Bin floor
-                        if (ball.y + BALL_RADIUS > binBottom) {
-                            ball.y = binBottom - BALL_RADIUS;
-                            ball.vy *= -BOUNCE;
-                        }
-
-                        // Collide with all other balls in bin area
-                        for (const other of balls) {
-                            if (other === ball) continue;
-                            if (other.inReservoir) continue;
-                            const dx = ball.x - other.x;
-                            const dy = ball.y - other.y;
-                            const dist = Math.sqrt(dx * dx + dy * dy);
-                            const minDist = BALL_RADIUS * 2;
-
-                            if (dist < minDist && dist > 0) {
-                                const nx = dx / dist;
-                                const ny = dy / dist;
-                                const overlap = minDist - dist;
-
-                                // Push apart equally
-                                ball.x += nx * overlap * 0.5;
-                                ball.y += ny * overlap * 0.5;
-                                other.x -= nx * overlap * 0.5;
-                                other.y -= ny * overlap * 0.5;
-
-                                // Exchange velocity with damping
-                                const dvx = ball.vx - other.vx;
-                                const dvy = ball.vy - other.vy;
-                                const dot = dvx * nx + dvy * ny;
-
-                                if (dot > 0) {
-                                    ball.vx -= dot * nx * 0.5;
-                                    ball.vy -= dot * ny * 0.5;
-                                    other.vx += dot * nx * 0.5;
-                                    other.vy += dot * ny * 0.5;
-                                }
-                            }
-                        }
-
-                        // Re-check bin boundaries after collision resolution
-                        if (ball.x - BALL_RADIUS < binLeft) ball.x = binLeft + BALL_RADIUS;
-                        if (ball.x + BALL_RADIUS > binRight) ball.x = binRight - BALL_RADIUS;
-                        if (ball.y + BALL_RADIUS > binBottom) ball.y = binBottom - BALL_RADIUS;
-
-                        // Mark as in bin if settled (low velocity)
-                        if (Math.abs(ball.vx) < 0.1 && Math.abs(ball.vy) < 0.1) {
-                            ball.inBin = true;
-                            ball.vx = 0;
-                            ball.vy = 0;
-                        }
+                        updateBinPhysics(ball);
                     }
                 }
 
-                // Ball-to-ball collisions
-                for (const other of balls) {
-                    if (other === ball || other.inBin) continue;
-                    const dx = ball.x - other.x;
-                    const dy = ball.y - other.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    const minDist = BALL_RADIUS * 2;
-
-                    if (dist < minDist && dist > 0) {
-                        const nx = dx / dist;
-                        const ny = dy / dist;
-                        const overlap = minDist - dist;
-
-                        if (other.resting) {
-                            // Push only the active ball away from resting ball
-                            ball.x += nx * overlap;
-                            ball.y += ny * overlap;
-                            // Bounce off resting ball
-                            const dot = ball.vx * nx + ball.vy * ny;
-                            ball.vx -= dot * nx * 1.5;
-                            ball.vy -= dot * ny * 1.5;
-                            ball.vx *= BOUNCE;
-                            ball.vy *= BOUNCE;
-                        } else {
-                            // Both balls active - share the separation
-                            ball.x += nx * overlap * 0.5;
-                            ball.y += ny * overlap * 0.5;
-                            other.x -= nx * overlap * 0.5;
-                            other.y -= ny * overlap * 0.5;
-
-                            // Velocity exchange
-                            const dvx = ball.vx - other.vx;
-                            const dvy = ball.vy - other.vy;
-                            const dot = dvx * nx + dvy * ny;
-
-                            ball.vx -= dot * nx * 0.5;
-                            ball.vy -= dot * ny * 0.5;
-                            other.vx += dot * nx * 0.5;
-                            other.vy += dot * ny * 0.5;
-                        }
-                    }
+                // Ball-to-ball collisions (outside bins)
+                if (!ball.inBin && ball.y <= BIN_TOP) {
+                    updateBallToBallCollisions(ball);
                 }
             }
 
@@ -641,11 +682,12 @@
             binCountSpan.textContent = balls.filter(b => b.inBin).length;
         }
 
-        // Animation loop
+        // ======================
+        // Animation Loop
+        // ======================
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Animate doors
             if (doorsOpen && doorAngle < DOOR_MAX_ANGLE) {
                 doorAngle += 0.03;
             } else if (!doorsOpen && doorAngle > 0) {
@@ -663,7 +705,9 @@
             requestAnimationFrame(animate);
         }
 
-        // Button handler
+        // ======================
+        // Event Handlers
+        // ======================
         dropButton.addEventListener('click', () => {
             if (!doorsOpen) {
                 doorsOpen = true;
@@ -676,7 +720,6 @@
             }
         });
 
-        // Slider handler
         ballSlider.addEventListener('input', (e) => {
             numBalls = parseInt(e.target.value);
             ballSliderValue.textContent = numBalls;
@@ -685,7 +728,9 @@
             }
         });
 
+        // ======================
         // Start
+        // ======================
         initBalls();
         initNails();
         animate();
