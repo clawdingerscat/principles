@@ -618,10 +618,13 @@
             // Bin boundaries
             Physics.constrainToRect(ball, BALL_RADIUS, binLeft, -Infinity, binRight, binBottom);
 
-            // Collide with other balls in bin
+            // Collide with other balls in bin - treat settled balls as static
             for (const other of balls) {
                 if (other === ball || other.inReservoir) continue;
-                Physics.collideBalls(ball, other, BALL_RADIUS, { onlyApproaching: true });
+                Physics.collideBalls(ball, other, BALL_RADIUS, {
+                    ball2Static: other.inBin,
+                    onlyApproaching: !other.inBin
+                });
             }
 
             // Re-constrain after ball collisions
@@ -675,6 +678,41 @@
                 if (!ball.inBin && ball.y <= BIN_TOP) {
                     updateBallToBallCollisions(ball);
                 }
+            }
+
+            // Ensure all bin balls stay within bounds and don't overlap (safety pass)
+            const binBottom = BIN_TOP + BIN_HEIGHT;
+            for (const ball of balls) {
+                if (!ball.inBin) continue;
+
+                const binIdx = Math.floor((ball.x - NAILBOARD_X) / BIN_WIDTH);
+                const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
+                const binLeft = NAILBOARD_X + idx * BIN_WIDTH;
+                const binRight = binLeft + BIN_WIDTH;
+
+                // Resolve overlaps with other settled balls in same bin
+                for (const other of balls) {
+                    if (other === ball || !other.inBin) continue;
+
+                    const dist = Physics.distance(ball.x, ball.y, other.x, other.y);
+                    const minDist = BALL_RADIUS * 2;
+
+                    if (dist < minDist && dist > 0) {
+                        const n = Physics.normalize(ball.x - other.x, ball.y - other.y);
+                        const overlap = minDist - dist;
+
+                        // Push both apart equally
+                        ball.x += n.x * overlap * 0.5;
+                        ball.y += n.y * overlap * 0.5;
+                        other.x -= n.x * overlap * 0.5;
+                        other.y -= n.y * overlap * 0.5;
+                    }
+                }
+
+                // Constrain to bin boundaries
+                if (ball.y + BALL_RADIUS > binBottom) ball.y = binBottom - BALL_RADIUS;
+                if (ball.x - BALL_RADIUS < binLeft) ball.x = binLeft + BALL_RADIUS;
+                if (ball.x + BALL_RADIUS > binRight) ball.x = binRight - BALL_RADIUS;
             }
 
             // Update stats
