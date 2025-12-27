@@ -138,6 +138,7 @@
                 <h3>Statistics</h3>
                 <div>Balls: <span id="ballCount">0</span></div>
                 <div>In bins: <span id="binCount">0</span></div>
+                <div>Beyond bins: <span id="beyondCount">0</span></div>
             </div>
         </div>
     </div>
@@ -323,6 +324,7 @@
         const dropButton = document.getElementById('dropButton');
         const ballCountSpan = document.getElementById('ballCount');
         const binCountSpan = document.getElementById('binCount');
+        const beyondCountSpan = document.getElementById('beyondCount');
         const ballSlider = document.getElementById('ballSlider');
         const ballSliderValue = document.getElementById('ballSliderValue');
         const gravitySlider = document.getElementById('gravitySlider');
@@ -429,7 +431,9 @@
         // ======================
         function getBinIndex(x) {
             const binIdx = Math.floor((x - BIN_AREA_X) / BIN_WIDTH);
-            return Math.max(0, Math.min(NUM_BINS - 1, binIdx));
+            // Return -1 if outside bin area (don't clamp)
+            if (binIdx < 0 || binIdx >= NUM_BINS) return -1;
+            return binIdx;
         }
 
         function getSlantY(x) {
@@ -582,6 +586,14 @@
 
                 // Determine bin boundaries
                 const idx = getBinIndex(ball.x);
+
+                // Ball drifted outside bins - wake it up
+                if (idx === -1) {
+                    ball.inBin = false;
+                    ball.beyondBins = true;
+                    continue;
+                }
+
                 const binLeft = BIN_AREA_X + idx * BIN_WIDTH;
                 const binRight = binLeft + BIN_WIDTH;
 
@@ -667,6 +679,13 @@
 
         function updateBinPhysics(ball) {
             const idx = getBinIndex(ball.x);
+
+            // Ball is beyond the bins - let it fall freely
+            if (idx === -1) {
+                ball.beyondBins = true;
+                return;
+            }
+
             const binLeft = BIN_AREA_X + idx * BIN_WIDTH;
             const binRight = binLeft + BIN_WIDTH;
             const binBottom = BIN_TOP + BIN_HEIGHT;
@@ -804,6 +823,14 @@
                 if (!ball.inBin) continue;
 
                 const idx = getBinIndex(ball.x);
+
+                // Ball is outside bins - shouldn't be marked as inBin
+                if (idx === -1) {
+                    ball.inBin = false;
+                    ball.beyondBins = true;
+                    continue;
+                }
+
                 const binLeft = BIN_AREA_X + idx * BIN_WIDTH;
                 const binRight = binLeft + BIN_WIDTH;
 
@@ -835,18 +862,24 @@
             // Update stats and bin counts
             binCounts.fill(0);
             let ballsInBinArea = 0;
+            let ballsBeyondBins = 0;
 
             for (const ball of balls) {
                 // Only count balls that are actually in the bin area (below BIN_TOP)
                 if (!ball.inReservoir && ball.y > BIN_TOP) {
-                    ballsInBinArea++;
                     const idx = getBinIndex(ball.x);
-                    binCounts[idx]++;
+                    if (idx === -1) {
+                        ballsBeyondBins++;
+                    } else {
+                        ballsInBinArea++;
+                        binCounts[idx]++;
+                    }
                 }
             }
 
             ballCountSpan.textContent = balls.length;
             binCountSpan.textContent = ballsInBinArea;
+            beyondCountSpan.textContent = ballsBeyondBins;
         }
 
         // ======================
