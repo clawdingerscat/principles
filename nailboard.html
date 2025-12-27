@@ -221,11 +221,12 @@
         }
 
         // Get slant Y position (slopes down toward center)
+        // Center is lowest (RESERVOIR_BOTTOM), edges are highest (RESERVOIR_BOTTOM - SLANT_HEIGHT)
         function getSlantY(x) {
             const distFromCenter = Math.abs(x - CENTER_X);
             const maxDist = RESERVOIR_WIDTH / 2;
             const ratio = distFromCenter / maxDist;
-            return RESERVOIR_BOTTOM - SLANT_HEIGHT * (1 - ratio);
+            return RESERVOIR_BOTTOM - SLANT_HEIGHT * ratio;
         }
 
         // Draw reservoir
@@ -233,17 +234,17 @@
             ctx.strokeStyle = '#4a7ab0';
             ctx.lineWidth = 3;
 
-            const slantTopY = RESERVOIR_BOTTOM - SLANT_HEIGHT;
+            const edgeY = RESERVOIR_BOTTOM - SLANT_HEIGHT; // Edges are higher
 
-            // Walls
+            // Walls - go down to the edge of the slant
             ctx.beginPath();
             ctx.moveTo(RESERVOIR_X, RESERVOIR_TOP);
-            ctx.lineTo(RESERVOIR_X, slantTopY);
+            ctx.lineTo(RESERVOIR_X, edgeY);
             ctx.stroke();
 
             ctx.beginPath();
             ctx.moveTo(RESERVOIR_X + RESERVOIR_WIDTH, RESERVOIR_TOP);
-            ctx.lineTo(RESERVOIR_X + RESERVOIR_WIDTH, slantTopY);
+            ctx.lineTo(RESERVOIR_X + RESERVOIR_WIDTH, edgeY);
             ctx.stroke();
 
             // Top
@@ -252,14 +253,14 @@
             ctx.lineTo(RESERVOIR_X + RESERVOIR_WIDTH, RESERVOIR_TOP);
             ctx.stroke();
 
-            // Slanted bottom
+            // Slanted bottom - slopes DOWN toward center (edges high, center low)
             ctx.beginPath();
-            ctx.moveTo(RESERVOIR_X, slantTopY);
+            ctx.moveTo(RESERVOIR_X, edgeY);
             ctx.lineTo(DOOR_LEFT, RESERVOIR_BOTTOM);
             ctx.stroke();
 
             ctx.beginPath();
-            ctx.moveTo(RESERVOIR_X + RESERVOIR_WIDTH, slantTopY);
+            ctx.moveTo(RESERVOIR_X + RESERVOIR_WIDTH, edgeY);
             ctx.lineTo(DOOR_RIGHT, RESERVOIR_BOTTOM);
             ctx.stroke();
 
