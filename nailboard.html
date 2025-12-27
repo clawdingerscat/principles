@@ -335,10 +335,36 @@
 
         // Physics update
         function updatePhysics() {
-            // Wake up resting balls when doors open
-            if (doorsOpen) {
-                for (const ball of balls) {
-                    if (ball.resting) ball.resting = false;
+            // Check if resting balls should wake up
+            for (const ball of balls) {
+                if (!ball.resting || ball.inBin) continue;
+
+                // Check if ball is still supported
+                const slantY = getSlantY(ball.x);
+                const onSlant = ball.y + BALL_RADIUS >= slantY - 1;
+
+                // Check if resting on another ball
+                let onOtherBall = false;
+                for (const other of balls) {
+                    if (other === ball || other.inBin) continue;
+                    const dx = ball.x - other.x;
+                    const dy = ball.y - other.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    // Ball is supported if there's another ball below it
+                    if (dist < BALL_RADIUS * 2.2 && dy < 0) {
+                        onOtherBall = true;
+                        break;
+                    }
+                }
+
+                // Wake up if not supported
+                if (!onSlant && !onOtherBall) {
+                    ball.resting = false;
+                }
+
+                // Also wake up when doors open
+                if (doorsOpen) {
+                    ball.resting = false;
                 }
             }
 
