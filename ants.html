@@ -8,8 +8,11 @@
         #grid {
             display: grid;
             grid-template-columns: repeat(100, 10px);
-            grid-gap: 1px;
+            grid-gap: 0;
             background-color: #f0f0f0;
+        }
+        #grid.show-lines {
+            grid-gap: 1px;
         }
         .cell {
             width: 10px;
@@ -37,7 +40,8 @@
         <label for="fillPercentage">Fill Percentage:</label>
         <input type="range" id="fillPercentage" min="0" max="100" value="30"><br>
         <label for="noiseLevel">Noise Level:</label>
-        <input type="range" id="noiseLevel" min="0" max="100" value="0">
+        <input type="range" id="noiseLevel" min="0" max="100" value="0"><br>
+        <input type="checkbox" id="showGrid"><label for="showGrid">Show Grid</label>
     </div>
     <div id="grid"></div>
     <script>
@@ -70,6 +74,12 @@
 
             noiseLevelInput.addEventListener('input', (e) => {
                 noiseLevel = parseInt(e.target.value);
+            });
+
+            const showGridCheckbox = document.getElementById('showGrid');
+            showGridCheckbox.addEventListener('change', (e) => {
+                const gridElement = document.getElementById('grid');
+                gridElement.classList.toggle('show-lines', e.target.checked);
             });
 
             // Initialize the simulation
