@@ -381,9 +381,18 @@
             for (let i = 0; i < numBalls; i++) {
                 const col = i % cols;
                 const row = Math.floor(i / cols);
+                const x = RESERVOIR_X + 10 + BALL_RADIUS + col * spacing;
+                let y = RESERVOIR_TOP + 10 + BALL_RADIUS + row * spacing;
+
+                // Ensure ball stays above the slant
+                const slantY = getSlantY(x);
+                if (y + BALL_RADIUS > slantY) {
+                    y = slantY - BALL_RADIUS;
+                }
+
                 balls.push({
-                    x: RESERVOIR_X + 10 + BALL_RADIUS + col * spacing,
-                    y: RESERVOIR_TOP + 10 + BALL_RADIUS + row * spacing,
+                    x: x,
+                    y: y,
                     vx: 0,
                     vy: 0,
                     inReservoir: true,
