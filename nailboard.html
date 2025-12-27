@@ -139,7 +139,7 @@
         const ballSliderValue = document.getElementById('ballSliderValue');
 
         // Configuration
-        const NAIL_RADIUS = 7;
+        const NAIL_RADIUS = 10;
         const GRAVITY = 0.25;
         const BOUNCE_DAMPING = 0.5;
         const FRICTION = 0.99;
@@ -205,6 +205,7 @@
                     vx: 0,
                     vy: 0,
                     inReservoir: true,
+                    settled: false,
                     inBin: false,
                     binIndex: -1
                 });
@@ -370,8 +371,13 @@
             for (const ball of balls) {
                 if (ball.inBin) continue;
 
-                // Skip physics for balls in reservoir when doors are closed
-                if (ball.inReservoir && !doorsOpen) continue;
+                // Wake up settled balls when doors open
+                if (ball.settled && doorsOpen) {
+                    ball.settled = false;
+                }
+
+                // Skip physics for settled balls in reservoir
+                if (ball.inReservoir && ball.settled) continue;
 
                 // Check if ball should exit reservoir through open doors
                 if (ball.inReservoir && doorsOpen && doorAngle > 0.3) {
@@ -443,6 +449,13 @@
                             }
                             ball.vy = -Math.abs(ball.vy) * BOUNCE_DAMPING * 0.3;
                         }
+                    }
+
+                    // Check if ball has settled (very low velocity)
+                    if (Math.abs(ball.vx) < 0.1 && Math.abs(ball.vy) < 0.1) {
+                        ball.vx = 0;
+                        ball.vy = 0;
+                        ball.settled = true;
                     }
                 } else {
                     // Nail collisions
