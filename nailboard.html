@@ -164,7 +164,7 @@
         const BIN_WIDTH = NAILBOARD_WIDTH / NUM_BINS;
 
         // Door configuration
-        const DOOR_WIDTH = 10; // Smaller opening for slower ball release
+        const DOOR_WIDTH = 6; // Small opening for slow ball release
         const DOOR_HINGE_X_LEFT = canvas.width / 2 - DOOR_WIDTH;
         const DOOR_HINGE_X_RIGHT = canvas.width / 2 + DOOR_WIDTH;
 
@@ -369,6 +369,9 @@
 
             for (const ball of balls) {
                 if (ball.inBin) continue;
+
+                // Skip physics for balls in reservoir when doors are closed
+                if (ball.inReservoir && !doorsOpen) continue;
 
                 // Check if ball should exit reservoir through open doors
                 if (ball.inReservoir && doorsOpen && doorAngle > 0.3) {
