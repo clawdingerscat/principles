@@ -175,12 +175,13 @@
         let doorAngle = 0; // Angle of hinged doors (0 = closed, Math.PI/2 = fully open)
         const DOOR_ANGLE_MAX = Math.PI / 2.5;
         let numBalls = 150;
-        const ballRadius = 3; // Fixed 6px diameter
+        const ballRadius = 6; // Fixed 12px diameter
 
         // Calculate max balls that fit in reservoir
         const BALL_DIAMETER = ballRadius * 2;
-        const reservoirUsableWidth = RESERVOIR_WIDTH - 10;
-        const reservoirUsableHeight = RESERVOIR_HEIGHT - SLANT_HEIGHT - 5;
+        // Use full reservoir height - balls will settle with physics
+        const reservoirUsableWidth = RESERVOIR_WIDTH - BALL_DIAMETER;
+        const reservoirUsableHeight = RESERVOIR_HEIGHT - BALL_DIAMETER;
         const maxCols = Math.floor(reservoirUsableWidth / BALL_DIAMETER);
         const maxRows = Math.floor(reservoirUsableHeight / BALL_DIAMETER);
         const MAX_BALLS = maxCols * maxRows;
@@ -195,8 +196,8 @@
             for (let i = 0; i < numBalls; i++) {
                 const col = i % cols;
                 const row = Math.floor(i / cols);
-                const x = RESERVOIR_X + 5 + ballRadius + col * BALL_DIAMETER + (Math.random() - 0.5) * 1;
-                const y = RESERVOIR_TOP + 5 + ballRadius + row * BALL_DIAMETER + (Math.random() - 0.5) * 1;
+                const x = RESERVOIR_X + ballRadius + col * BALL_DIAMETER + (Math.random() - 0.5) * 2;
+                const y = RESERVOIR_TOP + ballRadius + row * BALL_DIAMETER + (Math.random() - 0.5) * 2;
 
                 balls.push({
                     x: x,
