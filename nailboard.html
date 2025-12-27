@@ -342,38 +342,30 @@
                 // Check if ball is on the slant
                 const slantY = getSlantY(ball.x);
                 const onSlant = ball.y + BALL_RADIUS >= slantY - 1;
+                const nearCenter = Math.abs(ball.x - CENTER_X) < BALL_RADIUS * 3;
 
-                // Check if there's a ball blocking the path toward center
-                let blockedTowardCenter = false;
-                let supportedFromBelow = false;
-
+                // Check if touching a resting ball toward center
+                let touchingRestingTowardCenter = false;
                 for (const other of balls) {
-                    if (other === ball || other.inBin) continue;
+                    if (other === ball || !other.resting || other.inBin) continue;
                     const dx = ball.x - other.x;
                     const dy = ball.y - other.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    if (dist < BALL_RADIUS * 2.2) {
-                        // Check if other ball is toward the center (blocking downhill path)
+                    if (dist < BALL_RADIUS * 2.3) {
                         const otherTowardCenter = (ball.x < CENTER_X && other.x > ball.x) ||
                                                    (ball.x > CENTER_X && other.x < ball.x);
-                        if (otherTowardCenter && Math.abs(dy) < BALL_RADIUS * 1.5) {
-                            blockedTowardCenter = true;
-                        }
-                        // Check if supported from below
-                        if (dy < 0) {
-                            supportedFromBelow = true;
+                        if (otherTowardCenter) {
+                            touchingRestingTowardCenter = true;
+                            break;
                         }
                     }
                 }
 
                 // Wake up if:
-                // - Not on slant and not supported from below, OR
-                // - On slant but not blocked toward center (can roll down), OR
-                // - Doors are open
-                if (!onSlant && !supportedFromBelow) {
-                    ball.resting = false;
-                } else if (onSlant && !blockedTowardCenter) {
+                // - On slant but not near center AND not behind a resting ball
+                // - Doors are open (everyone evacuates)
+                if (onSlant && !nearCenter && !touchingRestingTowardCenter) {
                     ball.resting = false;
                 }
 
@@ -427,16 +419,40 @@
 
                             // Roll toward center with friction
                             if (ball.x < CENTER_X) {
-                                ball.vx += 0.08;
+                                ball.vx += 0.12;
                             } else if (ball.x > CENTER_X) {
-                                ball.vx -= 0.08;
+                                ball.vx -= 0.12;
                             }
                             ball.vy = 0;
                         }
                     }
 
-                    // Check if ball should rest (on surface with low velocity)
-                    if (onSurface && Math.abs(ball.vx) < 0.2 && Math.abs(ball.vy) < 0.2) {
+                    // Check if ball should rest
+                    // Can rest if: near center OR touching a resting ball toward center
+                    const nearCenter = Math.abs(ball.x - CENTER_X) < BALL_RADIUS * 3;
+                    let touchingRestingTowardCenter = false;
+
+                    if (!nearCenter) {
+                        for (const other of balls) {
+                            if (other === ball || !other.resting || other.inBin) continue;
+                            const odx = ball.x - other.x;
+                            const ody = ball.y - other.y;
+                            const odist = Math.sqrt(odx * odx + ody * ody);
+
+                            // Check if touching (within 2.2 radii) and other is toward center
+                            if (odist < BALL_RADIUS * 2.2) {
+                                const otherTowardCenter = (ball.x < CENTER_X && other.x > ball.x) ||
+                                                          (ball.x > CENTER_X && other.x < ball.x);
+                                if (otherTowardCenter) {
+                                    touchingRestingTowardCenter = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (onSurface && (nearCenter || touchingRestingTowardCenter) &&
+                        Math.abs(ball.vx) < 0.3 && Math.abs(ball.vy) < 0.3) {
                         ball.vx = 0;
                         ball.vy = 0;
                         ball.resting = true;
