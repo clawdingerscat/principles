@@ -708,6 +708,47 @@
                 }
             }
 
+            // Ensure all reservoir balls stay above slant and don't overlap (safety pass)
+            for (const ball of balls) {
+                if (!ball.inReservoir) continue;
+
+                // Resolve overlaps with other reservoir balls
+                for (const other of balls) {
+                    if (other === ball || !other.inReservoir) continue;
+
+                    const dist = Physics.distance(ball.x, ball.y, other.x, other.y);
+                    const minDist = BALL_RADIUS * 2;
+
+                    if (dist < minDist && dist > 0) {
+                        const n = Physics.normalize(ball.x - other.x, ball.y - other.y);
+                        const overlap = minDist - dist;
+
+                        // Push both apart, but bias upward to avoid going below slant
+                        ball.x += n.x * overlap * 0.5;
+                        ball.y += n.y * overlap * 0.5;
+                        other.x -= n.x * overlap * 0.5;
+                        other.y -= n.y * overlap * 0.5;
+
+                        // If pushed below slant, push back up
+                        const ballSlantY = getSlantY(ball.x);
+                        if (ball.y + BALL_RADIUS > ballSlantY) {
+                            ball.y = ballSlantY - BALL_RADIUS;
+                        }
+                        const otherSlantY = getSlantY(other.x);
+                        if (other.y + BALL_RADIUS > otherSlantY) {
+                            other.y = otherSlantY - BALL_RADIUS;
+                        }
+                    }
+                }
+
+                // Final constraint to slant and walls
+                const slantY = getSlantY(ball.x);
+                if (ball.y + BALL_RADIUS > slantY) ball.y = slantY - BALL_RADIUS;
+                if (ball.x - BALL_RADIUS < RESERVOIR_X) ball.x = RESERVOIR_X + BALL_RADIUS;
+                if (ball.x + BALL_RADIUS > RESERVOIR_X + RESERVOIR_WIDTH) ball.x = RESERVOIR_X + RESERVOIR_WIDTH - BALL_RADIUS;
+                if (ball.y - BALL_RADIUS < RESERVOIR_TOP) ball.y = RESERVOIR_TOP + BALL_RADIUS;
+            }
+
             // Ensure all bin balls stay within bounds and don't overlap (safety pass)
             const binBottom = BIN_TOP + BIN_HEIGHT;
             for (const ball of balls) {
