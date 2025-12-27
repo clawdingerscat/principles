@@ -139,7 +139,7 @@
         const ballSliderValue = document.getElementById('ballSliderValue');
 
         // Configuration
-        const NAIL_RADIUS = 4;
+        const NAIL_RADIUS = 7;
         const GRAVITY = 0.25;
         const BOUNCE_DAMPING = 0.5;
         const FRICTION = 0.99;
@@ -156,7 +156,7 @@
         const RESERVOIR_X = NAILBOARD_X;
         const SLANT_HEIGHT = 50; // Height of the slanted bottom section
 
-        const NAILBOARD_TOP = RESERVOIR_TOP + RESERVOIR_HEIGHT + 50;
+        const NAILBOARD_TOP = RESERVOIR_TOP + RESERVOIR_HEIGHT + 20;
         const NAILBOARD_HEIGHT = 380;
 
         const BIN_TOP = NAILBOARD_TOP + NAILBOARD_HEIGHT + 20;
@@ -290,6 +290,8 @@
             ctx.stroke();
 
             // Draw hinged doors
+            // When doorAngle=0: doors are horizontal (closed, meeting in middle)
+            // When doorAngle=max: doors swing down (open)
             const doorLength = DOOR_WIDTH;
             ctx.lineWidth = 4;
             ctx.strokeStyle = '#6a9ad0';
@@ -297,16 +299,16 @@
             // Left door - hinged at DOOR_HINGE_X_LEFT
             ctx.beginPath();
             ctx.moveTo(DOOR_HINGE_X_LEFT, bottomCenterY);
-            const leftDoorEndX = DOOR_HINGE_X_LEFT + Math.cos(Math.PI/2 - doorAngle) * doorLength;
-            const leftDoorEndY = bottomCenterY + Math.sin(Math.PI/2 - doorAngle) * doorLength;
+            const leftDoorEndX = DOOR_HINGE_X_LEFT + Math.cos(doorAngle) * doorLength;
+            const leftDoorEndY = bottomCenterY + Math.sin(doorAngle) * doorLength;
             ctx.lineTo(leftDoorEndX, leftDoorEndY);
             ctx.stroke();
 
             // Right door - hinged at DOOR_HINGE_X_RIGHT
             ctx.beginPath();
             ctx.moveTo(DOOR_HINGE_X_RIGHT, bottomCenterY);
-            const rightDoorEndX = DOOR_HINGE_X_RIGHT - Math.cos(Math.PI/2 - doorAngle) * doorLength;
-            const rightDoorEndY = bottomCenterY + Math.sin(Math.PI/2 - doorAngle) * doorLength;
+            const rightDoorEndX = DOOR_HINGE_X_RIGHT - Math.cos(doorAngle) * doorLength;
+            const rightDoorEndY = bottomCenterY + Math.sin(doorAngle) * doorLength;
             ctx.lineTo(rightDoorEndX, rightDoorEndY);
             ctx.stroke();
 
@@ -318,23 +320,6 @@
             ctx.beginPath();
             ctx.arc(DOOR_HINGE_X_RIGHT, bottomCenterY, 4, 0, Math.PI * 2);
             ctx.fill();
-
-            // Funnel below doors
-            ctx.strokeStyle = '#4a7ab0';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(DOOR_HINGE_X_LEFT - 10, bottomCenterY);
-            ctx.lineTo(centerX - 15, bottomCenterY + 40);
-            ctx.moveTo(DOOR_HINGE_X_RIGHT + 10, bottomCenterY);
-            ctx.lineTo(centerX + 15, bottomCenterY + 40);
-            ctx.stroke();
-        }
-
-        // Draw nailboard frame
-        function drawNailboardFrame() {
-            ctx.strokeStyle = '#4a7ab0';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(NAILBOARD_X, NAILBOARD_TOP, NAILBOARD_WIDTH, NAILBOARD_HEIGHT);
         }
 
         // Draw nails
@@ -555,23 +540,6 @@
                         }
                     }
 
-                    // Funnel collision
-                    const funnelTop = bottomCenterY;
-                    if (ball.y < NAILBOARD_TOP && ball.y > funnelTop) {
-                        const funnelProgress = (ball.y - funnelTop) / 40;
-                        const funnelHalfWidth = (DOOR_WIDTH + 10) - funnelProgress * (DOOR_WIDTH - 5);
-                        const funnelLeft = centerX - funnelHalfWidth;
-                        const funnelRight = centerX + funnelHalfWidth;
-
-                        if (ball.x - ballRadius < funnelLeft) {
-                            ball.x = funnelLeft + ballRadius;
-                            ball.vx = Math.abs(ball.vx) * BOUNCE_DAMPING;
-                        }
-                        if (ball.x + ballRadius > funnelRight) {
-                            ball.x = funnelRight - ballRadius;
-                            ball.vx = -Math.abs(ball.vx) * BOUNCE_DAMPING;
-                        }
-                    }
                 }
 
                 // Ball-to-ball collision
@@ -626,7 +594,6 @@
             updateBalls();
 
             drawReservoir();
-            drawNailboardFrame();
             drawNails();
             drawBins();
             drawBalls();
