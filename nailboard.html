@@ -336,7 +336,7 @@
         const NAIL_RADIUS = 8;
         const BALL_RADIUS = 5;
         const NUM_ROWS = 10;
-        const NUM_BINS = 11;
+        const NUM_BINS = 13;  // 11 center bins + 2 outer bins
 
         // Layout dimensions
         const NAILBOARD_WIDTH = 500;
@@ -351,9 +351,11 @@
         const NAILBOARD_TOP = RESERVOIR_TOP + RESERVOIR_HEIGHT + 30;
         const NAILBOARD_HEIGHT = 400;
 
+        // Bin dimensions - bins extend beyond nailboard to catch edge balls
+        const BIN_WIDTH = NAILBOARD_WIDTH / 11;  // Keep original bin width
+        const BIN_AREA_X = NAILBOARD_X - BIN_WIDTH;  // Start one bin-width to the left
         const BIN_TOP = NAILBOARD_TOP + NAILBOARD_HEIGHT + 10;
         const BIN_HEIGHT = 200;
-        const BIN_WIDTH = NAILBOARD_WIDTH / NUM_BINS;
 
         // Door configuration
         const DOOR_WIDTH = 8;
@@ -501,14 +503,14 @@
 
             for (let i = 0; i <= NUM_BINS; i++) {
                 ctx.beginPath();
-                ctx.moveTo(NAILBOARD_X + i * BIN_WIDTH, BIN_TOP);
-                ctx.lineTo(NAILBOARD_X + i * BIN_WIDTH, BIN_TOP + BIN_HEIGHT);
+                ctx.moveTo(BIN_AREA_X + i * BIN_WIDTH, BIN_TOP);
+                ctx.lineTo(BIN_AREA_X + i * BIN_WIDTH, BIN_TOP + BIN_HEIGHT);
                 ctx.stroke();
             }
 
             ctx.beginPath();
-            ctx.moveTo(NAILBOARD_X, BIN_TOP + BIN_HEIGHT);
-            ctx.lineTo(NAILBOARD_X + NAILBOARD_WIDTH, BIN_TOP + BIN_HEIGHT);
+            ctx.moveTo(BIN_AREA_X, BIN_TOP + BIN_HEIGHT);
+            ctx.lineTo(BIN_AREA_X + NUM_BINS * BIN_WIDTH, BIN_TOP + BIN_HEIGHT);
             ctx.stroke();
         }
 
@@ -573,9 +575,9 @@
                 if (onFloor) continue;
 
                 // Determine bin boundaries
-                const binIdx = Math.floor((ball.x - NAILBOARD_X) / BIN_WIDTH);
+                const binIdx = Math.floor((ball.x - BIN_AREA_X) / BIN_WIDTH);
                 const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
-                const binLeft = NAILBOARD_X + idx * BIN_WIDTH;
+                const binLeft = BIN_AREA_X + idx * BIN_WIDTH;
                 const binRight = binLeft + BIN_WIDTH;
 
                 // Check for support from left and right sides
@@ -655,21 +657,13 @@
                 });
             }
 
-            // Side walls
-            if (ball.x - BALL_RADIUS < NAILBOARD_X) {
-                ball.x = NAILBOARD_X + BALL_RADIUS;
-                ball.vx *= -Physics.bounce;
-            }
-            if (ball.x + BALL_RADIUS > NAILBOARD_X + NAILBOARD_WIDTH) {
-                ball.x = NAILBOARD_X + NAILBOARD_WIDTH - BALL_RADIUS;
-                ball.vx *= -Physics.bounce;
-            }
+            // No side walls - balls can escape to outer bins
         }
 
         function updateBinPhysics(ball) {
-            const binIdx = Math.floor((ball.x - NAILBOARD_X) / BIN_WIDTH);
+            const binIdx = Math.floor((ball.x - BIN_AREA_X) / BIN_WIDTH);
             const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
-            const binLeft = NAILBOARD_X + idx * BIN_WIDTH;
+            const binLeft = BIN_AREA_X + idx * BIN_WIDTH;
             const binRight = binLeft + BIN_WIDTH;
             const binBottom = BIN_TOP + BIN_HEIGHT;
 
@@ -805,9 +799,9 @@
             for (const ball of balls) {
                 if (!ball.inBin) continue;
 
-                const binIdx = Math.floor((ball.x - NAILBOARD_X) / BIN_WIDTH);
+                const binIdx = Math.floor((ball.x - BIN_AREA_X) / BIN_WIDTH);
                 const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
-                const binLeft = NAILBOARD_X + idx * BIN_WIDTH;
+                const binLeft = BIN_AREA_X + idx * BIN_WIDTH;
                 const binRight = binLeft + BIN_WIDTH;
 
                 // Resolve overlaps with other settled balls in same bin
