@@ -484,9 +484,9 @@
                     }
                 }
 
-                // Ball-to-ball collisions (for active balls only)
+                // Ball-to-ball collisions
                 for (const other of balls) {
-                    if (other === ball || other.inBin || other.resting) continue;
+                    if (other === ball || other.inBin) continue;
                     const dx = ball.x - other.x;
                     const dy = ball.y - other.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -495,22 +495,35 @@
                     if (dist < minDist && dist > 0) {
                         const nx = dx / dist;
                         const ny = dy / dist;
-                        const overlap = (minDist - dist) / 2;
+                        const overlap = minDist - dist;
 
-                        ball.x += nx * overlap;
-                        ball.y += ny * overlap;
-                        other.x -= nx * overlap;
-                        other.y -= ny * overlap;
+                        if (other.resting) {
+                            // Push only the active ball away from resting ball
+                            ball.x += nx * overlap;
+                            ball.y += ny * overlap;
+                            // Bounce off resting ball
+                            const dot = ball.vx * nx + ball.vy * ny;
+                            ball.vx -= dot * nx * 1.5;
+                            ball.vy -= dot * ny * 1.5;
+                            ball.vx *= BOUNCE;
+                            ball.vy *= BOUNCE;
+                        } else {
+                            // Both balls active - share the separation
+                            ball.x += nx * overlap * 0.5;
+                            ball.y += ny * overlap * 0.5;
+                            other.x -= nx * overlap * 0.5;
+                            other.y -= ny * overlap * 0.5;
 
-                        // Velocity exchange
-                        const dvx = ball.vx - other.vx;
-                        const dvy = ball.vy - other.vy;
-                        const dot = dvx * nx + dvy * ny;
+                            // Velocity exchange
+                            const dvx = ball.vx - other.vx;
+                            const dvy = ball.vy - other.vy;
+                            const dot = dvx * nx + dvy * ny;
 
-                        ball.vx -= dot * nx * 0.5;
-                        ball.vy -= dot * ny * 0.5;
-                        other.vx += dot * nx * 0.5;
-                        other.vy += dot * ny * 0.5;
+                            ball.vx -= dot * nx * 0.5;
+                            ball.vy -= dot * ny * 0.5;
+                            other.vx += dot * nx * 0.5;
+                            other.vy += dot * ny * 0.5;
+                        }
                     }
                 }
             }
