@@ -177,20 +177,19 @@
         let numBalls = 150;
         const ballRadius = 5; // Fixed 10px diameter
 
-        // Calculate max balls that fit in reservoir
+        // Calculate max balls that fit in reservoir (only in flat top portion)
         const BALL_DIAMETER = ballRadius * 2;
-        // Use full reservoir height - balls will settle with physics
+        const RESERVOIR_FLAT_HEIGHT = RESERVOIR_HEIGHT - SLANT_HEIGHT; // Only use flat top area
         const reservoirUsableWidth = RESERVOIR_WIDTH - BALL_DIAMETER;
-        const reservoirUsableHeight = RESERVOIR_HEIGHT - BALL_DIAMETER;
+        const reservoirUsableHeight = RESERVOIR_FLAT_HEIGHT - BALL_DIAMETER;
         const maxCols = Math.floor(reservoirUsableWidth / BALL_DIAMETER);
         const maxRows = Math.floor(reservoirUsableHeight / BALL_DIAMETER);
         const MAX_BALLS = maxCols * maxRows;
 
-        // Initialize balls in reservoir
+        // Initialize balls in reservoir (only in flat top portion)
         function initBalls() {
             balls = [];
 
-            // Calculate grid layout
             const cols = maxCols;
 
             for (let i = 0; i < numBalls; i++) {
@@ -199,16 +198,19 @@
                 const x = RESERVOIR_X + ballRadius + col * BALL_DIAMETER;
                 const y = RESERVOIR_TOP + ballRadius + row * BALL_DIAMETER;
 
-                balls.push({
-                    x: x,
-                    y: y,
-                    vx: 0,
-                    vy: 0,
-                    inReservoir: true,
-                    settled: false,
-                    inBin: false,
-                    binIndex: -1
-                });
+                // Only create ball if it fits in the flat portion
+                if (y + ballRadius <= RESERVOIR_TOP + RESERVOIR_FLAT_HEIGHT) {
+                    balls.push({
+                        x: x,
+                        y: y,
+                        vx: 0,
+                        vy: 0,
+                        inReservoir: true,
+                        settled: true, // Start settled since placed in valid positions
+                        inBin: false,
+                        binIndex: -1
+                    });
+                }
             }
         }
 
@@ -368,16 +370,18 @@
             const centerX = canvas.width / 2;
             const bottomCenterY = RESERVOIR_TOP + RESERVOIR_HEIGHT;
 
+            // Wake up all settled balls when doors open
+            if (doorsOpen) {
+                for (const ball of balls) {
+                    if (ball.settled && ball.inReservoir) {
+                        ball.settled = false;
+                    }
+                }
+            }
+
             for (const ball of balls) {
                 if (ball.inBin) continue;
-
-                // Wake up settled balls when doors open
-                if (ball.settled && doorsOpen) {
-                    ball.settled = false;
-                }
-
-                // Skip physics for settled balls in reservoir
-                if (ball.inReservoir && ball.settled) continue;
+                if (ball.settled) continue; // Skip all physics for settled balls
 
                 // Check if ball should exit reservoir through open doors
                 if (ball.inReservoir && doorsOpen && doorAngle > 0.3) {
@@ -402,9 +406,10 @@
                 ball.x += ball.vx;
                 ball.y += ball.vy;
 
-                if (ball.inReservoir) {
-                    const bottomEdgeY = RESERVOIR_TOP + RESERVOIR_HEIGHT - SLANT_HEIGHT;
+                // Track if ball is resting on something
+                let isResting = false;
 
+                if (ball.inReservoir) {
                     // Left wall
                     if (ball.x - ballRadius < RESERVOIR_X) {
                         ball.x = RESERVOIR_X + ballRadius;
@@ -431,28 +436,30 @@
                         if (inDoorArea && doorsOpen && doorAngle > 0.3) {
                             // Ball can pass through
                         } else if (inDoorArea && (!doorsOpen || doorAngle < 0.3)) {
-                            // Doors closed - bounce off
+                            // Doors closed - rest on door
                             ball.y = slantY - ballRadius;
-                            ball.vy = -Math.abs(ball.vy) * BOUNCE_DAMPING;
+                            ball.vy = 0;
+                            isResting = true;
                         } else {
                             // On the slanted surface - roll toward center
                             const isLeftSide = ball.x < centerX;
                             const slopeAngle = Math.atan2(SLANT_HEIGHT, RESERVOIR_WIDTH / 2 - DOOR_WIDTH);
 
                             ball.y = slantY - ballRadius;
+                            isResting = true;
 
                             // Add velocity component along slope toward center
                             if (isLeftSide) {
-                                ball.vx += Math.sin(slopeAngle) * 0.4;
+                                ball.vx += Math.sin(slopeAngle) * 0.3;
                             } else {
-                                ball.vx -= Math.sin(slopeAngle) * 0.4;
+                                ball.vx -= Math.sin(slopeAngle) * 0.3;
                             }
-                            ball.vy = -Math.abs(ball.vy) * BOUNCE_DAMPING * 0.3;
+                            ball.vy = 0;
                         }
                     }
 
-                    // Check if ball has settled (very low velocity)
-                    if (Math.abs(ball.vx) < 0.1 && Math.abs(ball.vy) < 0.1) {
+                    // Check if ball has settled (resting and very low velocity)
+                    if (isResting && Math.abs(ball.vx) < 0.15 && Math.abs(ball.vy) < 0.15) {
                         ball.vx = 0;
                         ball.vy = 0;
                         ball.settled = true;
@@ -551,9 +558,10 @@
 
                 }
 
-                // Ball-to-ball collision
+                // Ball-to-ball collision (only for active balls)
                 for (const other of balls) {
                     if (other === ball) continue;
+                    if (other.settled) continue; // Don't collide with settled balls
                     if (ball.inBin && other.inBin) continue;
 
                     const dx = ball.x - other.x;
