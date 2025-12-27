@@ -371,6 +371,7 @@
         let doorAngle = 0;
         const DOOR_MAX_ANGLE = Math.PI / 2;
         let numBalls = 300;
+        let binCounts = new Array(NUM_BINS).fill(0);  // Track balls per bin
 
         // ======================
         // Initialization
@@ -424,8 +425,13 @@
         }
 
         // ======================
-        // Slant Geometry
+        // Geometry Helpers
         // ======================
+        function getBinIndex(x) {
+            const binIdx = Math.floor((x - BIN_AREA_X) / BIN_WIDTH);
+            return Math.max(0, Math.min(NUM_BINS - 1, binIdx));
+        }
+
         function getSlantY(x) {
             const distFromCenter = Math.abs(x - CENTER_X);
             const maxDist = RESERVOIR_WIDTH / 2;
@@ -575,8 +581,7 @@
                 if (onFloor) continue;
 
                 // Determine bin boundaries
-                const binIdx = Math.floor((ball.x - BIN_AREA_X) / BIN_WIDTH);
-                const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
+                const idx = getBinIndex(ball.x);
                 const binLeft = BIN_AREA_X + idx * BIN_WIDTH;
                 const binRight = binLeft + BIN_WIDTH;
 
@@ -661,8 +666,7 @@
         }
 
         function updateBinPhysics(ball) {
-            const binIdx = Math.floor((ball.x - BIN_AREA_X) / BIN_WIDTH);
-            const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
+            const idx = getBinIndex(ball.x);
             const binLeft = BIN_AREA_X + idx * BIN_WIDTH;
             const binRight = binLeft + BIN_WIDTH;
             const binBottom = BIN_TOP + BIN_HEIGHT;
@@ -799,8 +803,7 @@
             for (const ball of balls) {
                 if (!ball.inBin) continue;
 
-                const binIdx = Math.floor((ball.x - BIN_AREA_X) / BIN_WIDTH);
-                const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
+                const idx = getBinIndex(ball.x);
                 const binLeft = BIN_AREA_X + idx * BIN_WIDTH;
                 const binRight = binLeft + BIN_WIDTH;
 
@@ -829,9 +832,23 @@
                 if (ball.x + BALL_RADIUS > binRight) ball.x = binRight - BALL_RADIUS;
             }
 
-            // Update stats
+            // Update stats and bin counts
+            binCounts.fill(0);
+            let ballsInBinArea = 0;
+
+            for (const ball of balls) {
+                // Count balls that have left reservoir and are in/past the bin area
+                if (!ball.inReservoir) {
+                    ballsInBinArea++;
+                    if (ball.y > BIN_TOP) {
+                        const idx = getBinIndex(ball.x);
+                        binCounts[idx]++;
+                    }
+                }
+            }
+
             ballCountSpan.textContent = balls.length;
-            binCountSpan.textContent = balls.filter(b => b.inBin).length;
+            binCountSpan.textContent = ballsInBinArea;
         }
 
         // ======================
