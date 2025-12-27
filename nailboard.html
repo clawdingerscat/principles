@@ -568,8 +568,38 @@
             for (const ball of balls) {
                 if (!ball.inBin) continue;
 
+                // On floor - always stable
                 const onFloor = ball.y + BALL_RADIUS >= binBottom - 1;
-                if (!onFloor && !Physics.hasSupport(ball, balls, BALL_RADIUS)) {
+                if (onFloor) continue;
+
+                // Determine bin boundaries
+                const binIdx = Math.floor((ball.x - NAILBOARD_X) / BIN_WIDTH);
+                const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
+                const binLeft = NAILBOARD_X + idx * BIN_WIDTH;
+                const binRight = binLeft + BIN_WIDTH;
+
+                // Check for support from left and right sides
+                let leftSupport = ball.x - BALL_RADIUS <= binLeft + 1;
+                let rightSupport = ball.x + BALL_RADIUS >= binRight - 1;
+
+                // Check for ball support from below
+                for (const other of balls) {
+                    if (other === ball) continue;
+                    const dx = ball.x - other.x;
+                    const dy = ball.y - other.y;
+                    const dist = Physics.distance(ball.x, ball.y, other.x, other.y);
+
+                    // Other ball is below and touching
+                    if (dist < BALL_RADIUS * 2.2 && dy < 0) {
+                        // Ball provides left support if it's to the left of this ball's center
+                        if (dx > BALL_RADIUS * 0.3) leftSupport = true;
+                        // Ball provides right support if it's to the right of this ball's center
+                        if (dx < -BALL_RADIUS * 0.3) rightSupport = true;
+                    }
+                }
+
+                // Not stable (missing support from one side) - wake up to roll
+                if (!leftSupport || !rightSupport) {
                     ball.inBin = false;
                 }
             }
@@ -658,10 +688,31 @@
             // Re-constrain after ball collisions
             Physics.constrainToRect(ball, BALL_RADIUS, binLeft, -Infinity, binRight, binBottom);
 
-            // Settle in bin
+            // Only settle if velocity is low AND position is stable
             if (Physics.isSettled(ball, 0.1)) {
-                ball.inBin = true;
-                Physics.stop(ball);
+                // Check stability - need support from both sides or be on floor
+                const onFloor = ball.y + BALL_RADIUS >= binBottom - 1;
+
+                let leftSupport = ball.x - BALL_RADIUS <= binLeft + 1;
+                let rightSupport = ball.x + BALL_RADIUS >= binRight - 1;
+
+                for (const other of balls) {
+                    if (other === ball) continue;
+                    const dx = ball.x - other.x;
+                    const dy = ball.y - other.y;
+                    const dist = Physics.distance(ball.x, ball.y, other.x, other.y);
+
+                    if (dist < BALL_RADIUS * 2.2 && dy < 0) {
+                        if (dx > BALL_RADIUS * 0.3) leftSupport = true;
+                        if (dx < -BALL_RADIUS * 0.3) rightSupport = true;
+                    }
+                }
+
+                // Only settle if stable
+                if (onFloor || (leftSupport && rightSupport)) {
+                    ball.inBin = true;
+                    Physics.stop(ball);
+                }
             }
         }
 
