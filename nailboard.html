@@ -375,8 +375,34 @@
             }
 
             for (const ball of balls) {
-                if (ball.inBin) continue;
-                if (ball.resting) continue; // Skip physics for resting balls
+                if (ball.resting && ball.inReservoir) continue; // Only skip reservoir resting balls
+
+                // Wake up bin balls that aren't supported
+                if (ball.inBin) {
+                    const binBottom = BIN_TOP + BIN_HEIGHT;
+                    const onFloor = ball.y + BALL_RADIUS >= binBottom - 1;
+
+                    if (!onFloor) {
+                        // Check if supported by other balls
+                        let supported = false;
+                        for (const other of balls) {
+                            if (other === ball) continue;
+                            const dx = ball.x - other.x;
+                            const dy = ball.y - other.y;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            // Supported if there's a ball below and close
+                            if (dist < BALL_RADIUS * 2.2 && dy < 0) {
+                                supported = true;
+                                break;
+                            }
+                        }
+                        if (!supported) {
+                            ball.inBin = false; // Wake up and fall
+                        }
+                    }
+                }
+
+                if (ball.inBin) continue; // Skip settled bin balls
 
                 // Apply gravity
                 ball.vy += GRAVITY;
@@ -500,6 +526,7 @@
                         const idx = Math.max(0, Math.min(NUM_BINS - 1, binIdx));
                         const binLeft = NAILBOARD_X + idx * BIN_WIDTH;
                         const binRight = binLeft + BIN_WIDTH;
+                        const binBottom = BIN_TOP + BIN_HEIGHT;
 
                         // Bin walls
                         if (ball.x - BALL_RADIUS < binLeft) {
@@ -512,30 +539,55 @@
                         }
 
                         // Bin floor
-                        if (ball.y + BALL_RADIUS > BIN_TOP + BIN_HEIGHT) {
-                            ball.y = BIN_TOP + BIN_HEIGHT - BALL_RADIUS;
+                        if (ball.y + BALL_RADIUS > binBottom) {
+                            ball.y = binBottom - BALL_RADIUS;
                             ball.vy *= -BOUNCE;
-                            if (Math.abs(ball.vy) < 0.5) {
-                                ball.inBin = true;
-                            }
                         }
 
-                        // Stack on other balls in bin
+                        // Collide with all other balls in bin area
                         for (const other of balls) {
-                            if (other === ball || !other.inBin) continue;
+                            if (other === ball) continue;
+                            if (other.inReservoir) continue;
                             const dx = ball.x - other.x;
                             const dy = ball.y - other.y;
                             const dist = Math.sqrt(dx * dx + dy * dy);
-                            if (dist < BALL_RADIUS * 2 && dist > 0) {
+                            const minDist = BALL_RADIUS * 2;
+
+                            if (dist < minDist && dist > 0) {
                                 const nx = dx / dist;
                                 const ny = dy / dist;
-                                ball.x = other.x + nx * BALL_RADIUS * 2;
-                                ball.y = other.y + ny * BALL_RADIUS * 2;
-                                ball.vy *= -BOUNCE;
-                                if (Math.abs(ball.vy) < 0.5) {
-                                    ball.inBin = true;
+                                const overlap = minDist - dist;
+
+                                // Push apart equally
+                                ball.x += nx * overlap * 0.5;
+                                ball.y += ny * overlap * 0.5;
+                                other.x -= nx * overlap * 0.5;
+                                other.y -= ny * overlap * 0.5;
+
+                                // Exchange velocity with damping
+                                const dvx = ball.vx - other.vx;
+                                const dvy = ball.vy - other.vy;
+                                const dot = dvx * nx + dvy * ny;
+
+                                if (dot > 0) {
+                                    ball.vx -= dot * nx * 0.5;
+                                    ball.vy -= dot * ny * 0.5;
+                                    other.vx += dot * nx * 0.5;
+                                    other.vy += dot * ny * 0.5;
                                 }
                             }
+                        }
+
+                        // Re-check bin boundaries after collision resolution
+                        if (ball.x - BALL_RADIUS < binLeft) ball.x = binLeft + BALL_RADIUS;
+                        if (ball.x + BALL_RADIUS > binRight) ball.x = binRight - BALL_RADIUS;
+                        if (ball.y + BALL_RADIUS > binBottom) ball.y = binBottom - BALL_RADIUS;
+
+                        // Mark as in bin if settled (low velocity)
+                        if (Math.abs(ball.vx) < 0.1 && Math.abs(ball.vy) < 0.1) {
+                            ball.inBin = true;
+                            ball.vx = 0;
+                            ball.vy = 0;
                         }
                     }
                 }
