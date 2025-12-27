@@ -119,7 +119,20 @@
             <button id="dropButton">Drop Balls</button>
             <div class="slider-container">
                 <label>Number of Balls: <span id="ballSliderValue" class="slider-value">100</span></label>
-                <input type="range" id="ballSlider" min="1" max="200" value="100">
+                <input type="range" id="ballSlider" min="1" max="400" value="100">
+            </div>
+            <h3>Physics</h3>
+            <div class="slider-container">
+                <label>Gravity: <span id="gravityValue" class="slider-value">0.15</span></label>
+                <input type="range" id="gravitySlider" min="0.01" max="0.5" step="0.01" value="0.15">
+            </div>
+            <div class="slider-container">
+                <label>Friction: <span id="frictionValue" class="slider-value">0.98</span></label>
+                <input type="range" id="frictionSlider" min="0.9" max="1.0" step="0.01" value="0.98">
+            </div>
+            <div class="slider-container">
+                <label>Bounce: <span id="bounceValue" class="slider-value">0.4</span></label>
+                <input type="range" id="bounceSlider" min="0.1" max="0.9" step="0.05" value="0.4">
             </div>
             <div class="stats">
                 <h3>Statistics</h3>
@@ -312,6 +325,12 @@
         const binCountSpan = document.getElementById('binCount');
         const ballSlider = document.getElementById('ballSlider');
         const ballSliderValue = document.getElementById('ballSliderValue');
+        const gravitySlider = document.getElementById('gravitySlider');
+        const gravityValue = document.getElementById('gravityValue');
+        const frictionSlider = document.getElementById('frictionSlider');
+        const frictionValue = document.getElementById('frictionValue');
+        const bounceSlider = document.getElementById('bounceSlider');
+        const bounceValue = document.getElementById('bounceValue');
 
         // Configuration
         const NAIL_RADIUS = 8;
@@ -764,6 +783,21 @@
             if (!doorsOpen) {
                 initBalls();
             }
+        });
+
+        gravitySlider.addEventListener('input', (e) => {
+            Physics.gravity = parseFloat(e.target.value);
+            gravityValue.textContent = Physics.gravity.toFixed(2);
+        });
+
+        frictionSlider.addEventListener('input', (e) => {
+            Physics.friction = parseFloat(e.target.value);
+            frictionValue.textContent = Physics.friction.toFixed(2);
+        });
+
+        bounceSlider.addEventListener('input', (e) => {
+            Physics.bounce = parseFloat(e.target.value);
+            bounceValue.textContent = Physics.bounce.toFixed(2);
         });
 
         // ======================
