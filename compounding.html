@@ -537,12 +537,16 @@
             
             <div class="controls">
                 <div class="control-group">
-                    <label>Starting Amount: $<span class="control-value" id="startValue">100</span></label>
-                    <input type="range" id="startAmount" min="10" max="1000" step="10" value="100">
+                    <label>Linear Start: <span class="control-value" id="linearStartValue">100</span></label>
+                    <input type="range" id="linearStart" min="10" max="1000" step="10" value="100">
                 </div>
                 <div class="control-group">
-                    <label>Linear: +$<span class="control-value" id="linearValue">10</span>/period</label>
+                    <label>Linear: +<span class="control-value" id="linearValue">10</span>/period</label>
                     <input type="range" id="linearRate" min="1" max="50" step="1" value="10">
+                </div>
+                <div class="control-group">
+                    <label>Exponential Start: <span class="control-value" id="expStartValue">100</span></label>
+                    <input type="range" id="expStart" min="10" max="1000" step="10" value="100">
                 </div>
                 <div class="control-group">
                     <label>Exponential: +<span class="control-value" id="expValue">10</span>%/period</label>
@@ -572,11 +576,11 @@
             <div class="stats">
                 <div class="stat">
                     <div class="stat-label">Linear Final</div>
-                    <div class="stat-value linear" id="linearFinal">$400</div>
+                    <div class="stat-value linear" id="linearFinal">400</div>
                 </div>
                 <div class="stat">
                     <div class="stat-label">Exponential Final</div>
-                    <div class="stat-value exponential" id="expFinal">$1,745</div>
+                    <div class="stat-value exponential" id="expFinal">1,745</div>
                 </div>
                 <div class="stat">
                     <div class="stat-label">Difference</div>
@@ -898,28 +902,29 @@
         const canvas = document.getElementById('chart');
         const ctx = canvas.getContext('2d');
 
-        function formatMoney(amount) {
+        function formatAmount(amount) {
             if (amount >= 1000000) {
-                return '$' + (amount / 1000000).toFixed(1) + 'M';
+                return (amount / 1000000).toFixed(1) + 'M';
             } else if (amount >= 1000) {
-                return '$' + (amount / 1000).toFixed(1) + 'K';
+                return (amount / 1000).toFixed(1) + 'K';
             }
-            return '$' + amount.toFixed(0);
+            return amount.toFixed(0);
         }
 
         function drawChart() {
-            const startAmount = parseFloat(document.getElementById('startAmount').value);
+            const linearStart = parseFloat(document.getElementById('linearStart').value);
+            const expStart = parseFloat(document.getElementById('expStart').value);
             const linearRate = parseFloat(document.getElementById('linearRate').value);
             const expRate = parseFloat(document.getElementById('expRate').value) / 100;
             const periods = parseInt(document.getElementById('periods').value);
 
             // Calculate values
-            const linearValues = [startAmount];
-            const expValues = [startAmount];
+            const linearValues = [linearStart];
+            const expValues = [expStart];
 
             for (let i = 1; i <= periods; i++) {
-                linearValues.push(startAmount + linearRate * i);
-                expValues.push(startAmount * Math.pow(1 + expRate, i));
+                linearValues.push(linearStart + linearRate * i);
+                expValues.push(expStart * Math.pow(1 + expRate, i));
             }
 
             const maxValue = Math.max(...linearValues, ...expValues);
@@ -944,14 +949,15 @@
                 ctx.stroke();
 
                 const value = maxValue - (maxValue - minValue) * i / 5;
-                ctx.fillStyle = '#666';
-                ctx.font = '12px Georgia';
+                ctx.fillStyle = '#aaa';
+                ctx.font = '13px Georgia';
                 ctx.textAlign = 'right';
-                ctx.fillText(formatMoney(value), padding.left - 10, y + 4);
+                ctx.fillText(formatAmount(value), padding.left - 10, y + 4);
             }
 
             // X-axis labels
-            ctx.fillStyle = '#666';
+            ctx.fillStyle = '#aaa';
+            ctx.font = '13px Georgia';
             ctx.textAlign = 'center';
             for (let i = 0; i <= periods; i += Math.ceil(periods / 10)) {
                 const x = padding.left + (chartWidth * i / periods);
@@ -986,14 +992,14 @@
             // Update stats
             const linearFinal = linearValues[periods];
             const expFinal = expValues[periods];
-            document.getElementById('linearFinal').textContent = formatMoney(linearFinal);
-            document.getElementById('expFinal').textContent = formatMoney(expFinal);
+            document.getElementById('linearFinal').textContent = formatAmount(linearFinal);
+            document.getElementById('expFinal').textContent = formatAmount(expFinal);
             document.getElementById('difference').textContent = (expFinal / linearFinal).toFixed(1) + 'x';
         }
 
         // Slider event listeners
-        const sliders = ['startAmount', 'linearRate', 'expRate', 'periods'];
-        const valueDisplays = ['startValue', 'linearValue', 'expValue', 'periodsValue'];
+        const sliders = ['linearStart', 'linearRate', 'expStart', 'expRate', 'periods'];
+        const valueDisplays = ['linearStartValue', 'linearValue', 'expStartValue', 'expValue', 'periodsValue'];
 
         sliders.forEach((sliderId, index) => {
             const slider = document.getElementById(sliderId);
