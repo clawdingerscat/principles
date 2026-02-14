@@ -351,11 +351,11 @@
         /* Lily pad animation */
         .lilypad-outer {
             position: relative;
-            width: 340px;
+            width: 360px;
             height: 340px;
             margin: 20px auto;
             background: #5a4a3a;
-            border-radius: 50%;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -368,6 +368,59 @@
             background: #1a4a6a;
             border-radius: 50%;
             overflow: hidden;
+        }
+
+        /* Penny visualization */
+        .penny-canvas-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .penny-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .penny-day-display {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 18px;
+            color: #7faadb;
+        }
+
+        .penny-values {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 15px;
+        }
+
+        .penny-value {
+            text-align: center;
+        }
+
+        .penny-value-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .penny-value-amount {
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .penny-value-amount.million {
+            color: #7faadb;
+        }
+
+        .penny-value-amount.penny {
+            color: #70e070;
         }
 
         .lilypad {
@@ -451,6 +504,26 @@
             <div class="puzzle-result" id="result2">
                 <h3 id="result2-title"></h3>
                 <p id="result2-text"></p>
+            </div>
+            <div class="puzzle-visual" id="visual2">
+                <div class="penny-canvas-container">
+                    <canvas id="pennyChart" width="700" height="300"></canvas>
+                </div>
+                <div class="penny-day-display">Day <span id="penny-day">1</span></div>
+                <div class="penny-values">
+                    <div class="penny-value">
+                        <div class="penny-value-label">$1 Million</div>
+                        <div class="penny-value-amount million">$1,000,000</div>
+                    </div>
+                    <div class="penny-value">
+                        <div class="penny-value-label">Doubling Penny</div>
+                        <div class="penny-value-amount penny" id="penny-amount">$0.01</div>
+                    </div>
+                </div>
+                <div class="penny-controls">
+                    <button class="secondary" id="penny-reset">Reset</button>
+                    <button class="primary" id="penny-play">Play</button>
+                </div>
             </div>
         </div>
 
@@ -674,8 +747,152 @@
                 text.innerHTML = `The doubling penny is worth <strong>$5,368,709.12</strong> after 30 days — 
                     more than 5x the million dollars. Day 1: $0.01. Day 10: $5.12. Day 20: $5,242.88. 
                     Day 30: over $5 million. Almost all the value accumulates in the final days.`;
+
+                document.getElementById('visual2').classList.add('show');
             });
         });
+
+        // Penny chart animation
+        let pennyDay = 1;
+        let pennyPlaying = false;
+        let pennyInterval;
+        const pennyCanvas = document.getElementById('pennyChart');
+        const pennyCtx = pennyCanvas.getContext('2d');
+
+        function formatPennyMoney(amount) {
+            if (amount >= 1000000) {
+                return '$' + (amount / 1000000).toFixed(2) + 'M';
+            } else if (amount >= 1000) {
+                return '$' + (amount / 1000).toFixed(2) + 'K';
+            } else if (amount >= 1) {
+                return '$' + amount.toFixed(2);
+            }
+            return '$' + amount.toFixed(2);
+        }
+
+        function drawPennyChart() {
+            const million = 1000000;
+            const maxValue = 5368709.12; // Final penny value
+            const padding = { top: 30, right: 30, bottom: 40, left: 80 };
+            const chartWidth = pennyCanvas.width - padding.left - padding.right;
+            const chartHeight = pennyCanvas.height - padding.top - padding.bottom;
+
+            // Clear
+            pennyCtx.clearRect(0, 0, pennyCanvas.width, pennyCanvas.height);
+
+            // Background
+            pennyCtx.fillStyle = '#0d1421';
+            pennyCtx.fillRect(0, 0, pennyCanvas.width, pennyCanvas.height);
+
+            // Grid lines
+            pennyCtx.strokeStyle = '#2a3a5e';
+            pennyCtx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding.top + (chartHeight * i / 5);
+                pennyCtx.beginPath();
+                pennyCtx.moveTo(padding.left, y);
+                pennyCtx.lineTo(pennyCanvas.width - padding.right, y);
+                pennyCtx.stroke();
+
+                const value = maxValue - (maxValue * i / 5);
+                pennyCtx.fillStyle = '#666';
+                pennyCtx.font = '12px Georgia';
+                pennyCtx.textAlign = 'right';
+                pennyCtx.fillText(formatPennyMoney(value), padding.left - 10, y + 4);
+            }
+
+            // X-axis labels
+            pennyCtx.fillStyle = '#666';
+            pennyCtx.textAlign = 'center';
+            for (let i = 0; i <= 30; i += 5) {
+                const x = padding.left + (chartWidth * i / 30);
+                pennyCtx.fillText(i.toString(), x, pennyCanvas.height - padding.bottom + 20);
+            }
+            pennyCtx.fillText('Days', pennyCanvas.width / 2, pennyCanvas.height - 5);
+
+            // Draw $1M line (flat)
+            const millionY = padding.top + chartHeight * (1 - million / maxValue);
+            pennyCtx.strokeStyle = '#7faadb';
+            pennyCtx.lineWidth = 3;
+            pennyCtx.setLineDash([10, 5]);
+            pennyCtx.beginPath();
+            pennyCtx.moveTo(padding.left, millionY);
+            pennyCtx.lineTo(padding.left + (chartWidth * pennyDay / 30), millionY);
+            pennyCtx.stroke();
+            pennyCtx.setLineDash([]);
+
+            // Label for million
+            if (pennyDay >= 5) {
+                pennyCtx.fillStyle = '#7faadb';
+                pennyCtx.font = '14px Georgia';
+                pennyCtx.textAlign = 'left';
+                pennyCtx.fillText('$1 Million', padding.left + 10, millionY - 10);
+            }
+
+            // Draw penny growth
+            pennyCtx.strokeStyle = '#70e070';
+            pennyCtx.lineWidth = 3;
+            pennyCtx.beginPath();
+            for (let d = 1; d <= pennyDay; d++) {
+                const pennyValue = 0.01 * Math.pow(2, d - 1);
+                const x = padding.left + (chartWidth * d / 30);
+                const y = padding.top + chartHeight * (1 - Math.min(pennyValue, maxValue) / maxValue);
+                if (d === 1) pennyCtx.moveTo(x, y);
+                else pennyCtx.lineTo(x, y);
+            }
+            pennyCtx.stroke();
+
+            // Current penny value
+            const currentPenny = 0.01 * Math.pow(2, pennyDay - 1);
+            document.getElementById('penny-day').textContent = pennyDay;
+            document.getElementById('penny-amount').textContent = formatPennyMoney(currentPenny);
+
+            // Highlight when penny crosses million
+            if (currentPenny >= million) {
+                document.getElementById('penny-amount').style.color = '#90ff90';
+            } else {
+                document.getElementById('penny-amount').style.color = '#70e070';
+            }
+        }
+
+        document.getElementById('penny-play').addEventListener('click', () => {
+            if (pennyPlaying) {
+                clearInterval(pennyInterval);
+                pennyPlaying = false;
+                document.getElementById('penny-play').textContent = 'Play';
+            } else {
+                pennyPlaying = true;
+                document.getElementById('penny-play').textContent = 'Pause';
+                pennyInterval = setInterval(() => {
+                    if (pennyDay >= 30) {
+                        clearInterval(pennyInterval);
+                        pennyPlaying = false;
+                        document.getElementById('penny-play').textContent = 'Play';
+                        return;
+                    }
+                    pennyDay++;
+                    drawPennyChart();
+                }, 300);
+            }
+        });
+
+        document.getElementById('penny-reset').addEventListener('click', () => {
+            clearInterval(pennyInterval);
+            pennyPlaying = false;
+            pennyDay = 1;
+            document.getElementById('penny-play').textContent = 'Play';
+            drawPennyChart();
+        });
+
+        // Initialize penny chart when visible
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.target.classList.contains('show')) {
+                    drawPennyChart();
+                }
+            });
+        });
+        observer.observe(document.getElementById('visual2'), { attributes: true, attributeFilter: ['class'] });
 
         // Chart visualization
         const canvas = document.getElementById('chart');
