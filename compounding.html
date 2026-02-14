@@ -349,11 +349,22 @@
         }
 
         /* Lily pad animation */
+        .lilypad-outer {
+            position: relative;
+            width: 340px;
+            height: 340px;
+            margin: 20px auto;
+            background: #5a4a3a;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .lilypad-container {
             position: relative;
             width: 300px;
             height: 300px;
-            margin: 20px auto;
             background: #1a4a6a;
             border-radius: 50%;
             overflow: hidden;
@@ -413,8 +424,10 @@
                 <p id="result1-text"></p>
             </div>
             <div class="puzzle-visual" id="visual1">
-                <div class="lilypad-container">
-                    <div class="lilypad" id="lilypad"></div>
+                <div class="lilypad-outer">
+                    <div class="lilypad-container">
+                        <div class="lilypad" id="lilypad"></div>
+                    </div>
                 </div>
                 <div class="day-display">Day <span id="lilypad-day">1</span> — <span id="lilypad-percent">0.0000001%</span> covered</div>
                 <div class="lilypad-controls">
@@ -578,7 +591,7 @@
 
             // Size is 2^(day-30) of full size (300px)
             const fraction = Math.pow(2, lilypadDay - 30);
-            const size = Math.max(2, 280 * Math.sqrt(fraction));
+            const size = Math.max(2, 300 * Math.sqrt(fraction));
             
             pad.style.width = size + 'px';
             pad.style.height = size + 'px';
@@ -587,7 +600,7 @@
             
             const percent = fraction * 100;
             if (percent < 0.01) {
-                percentSpan.textContent = percent.toExponential(1) + '%';
+                percentSpan.textContent = '< 0.01%';
             } else if (percent < 1) {
                 percentSpan.textContent = percent.toFixed(2) + '%';
             } else {
