@@ -573,6 +573,11 @@
                 </div>
             </div>
 
+            <div class="viz-controls" style="margin-top: 20px;">
+                <button class="secondary" id="chart-reset">Reset</button>
+                <button class="primary" id="chart-play">Play</button>
+            </div>
+
             <div class="stats">
                 <div class="stat">
                     <div class="stat-label">Linear Final</div>
@@ -965,11 +970,11 @@
             }
             ctx.fillText('Periods', canvas.width / 2, canvas.height - 5);
 
-            // Draw linear line
+            // Draw linear line up to current period
             ctx.strokeStyle = '#7faadb';
             ctx.lineWidth = 3;
             ctx.beginPath();
-            for (let i = 0; i <= periods; i++) {
+            for (let i = 0; i <= currentPeriod; i++) {
                 const x = padding.left + (chartWidth * i / periods);
                 const y = padding.top + chartHeight * (1 - (linearValues[i] - minValue) / (maxValue - minValue));
                 if (i === 0) ctx.moveTo(x, y);
@@ -977,11 +982,11 @@
             }
             ctx.stroke();
 
-            // Draw exponential line
+            // Draw exponential line up to current period
             ctx.strokeStyle = '#70e070';
             ctx.lineWidth = 3;
             ctx.beginPath();
-            for (let i = 0; i <= periods; i++) {
+            for (let i = 0; i <= currentPeriod; i++) {
                 const x = padding.left + (chartWidth * i / periods);
                 const y = padding.top + chartHeight * (1 - (expValues[i] - minValue) / (maxValue - minValue));
                 if (i === 0) ctx.moveTo(x, y);
@@ -989,13 +994,56 @@
             }
             ctx.stroke();
 
-            // Update stats
-            const linearFinal = linearValues[periods];
-            const expFinal = expValues[periods];
-            document.getElementById('linearFinal').textContent = formatAmount(linearFinal);
-            document.getElementById('expFinal').textContent = formatAmount(expFinal);
-            document.getElementById('difference').textContent = (expFinal / linearFinal).toFixed(1) + 'x';
+            // Update stats based on current period
+            const linearCurrent = linearValues[currentPeriod];
+            const expCurrent = expValues[currentPeriod];
+            document.getElementById('linearFinal').textContent = formatAmount(linearCurrent);
+            document.getElementById('expFinal').textContent = formatAmount(expCurrent);
+            document.getElementById('difference').textContent = (expCurrent / linearCurrent).toFixed(1) + 'x';
         }
+
+        // Chart animation state
+        let chartPeriod = 1;
+        let chartPlaying = false;
+        let chartInterval;
+        let currentPeriod = 1;
+
+        function animateChart() {
+            const periods = parseInt(document.getElementById('periods').value);
+            currentPeriod = chartPeriod;
+            drawChart();
+        }
+
+        document.getElementById('chart-play').addEventListener('click', () => {
+            const periods = parseInt(document.getElementById('periods').value);
+            if (chartPlaying) {
+                clearInterval(chartInterval);
+                chartPlaying = false;
+                document.getElementById('chart-play').textContent = 'Play';
+            } else {
+                chartPlaying = true;
+                document.getElementById('chart-play').textContent = 'Pause';
+                chartInterval = setInterval(() => {
+                    if (chartPeriod >= periods) {
+                        clearInterval(chartInterval);
+                        chartPlaying = false;
+                        document.getElementById('chart-play').textContent = 'Play';
+                        return;
+                    }
+                    chartPeriod++;
+                    animateChart();
+                }, 150);
+            }
+        });
+
+        document.getElementById('chart-reset').addEventListener('click', () => {
+            clearInterval(chartInterval);
+            chartPlaying = false;
+            chartPeriod = 1;
+            currentPeriod = 1;
+            document.getElementById('chart-play').textContent = 'Play';
+            animateChart();
+        });
 
         // Slider event listeners
         const sliders = ['linearStart', 'linearRate', 'expStart', 'expRate', 'periods'];
@@ -1007,12 +1055,19 @@
             
             slider.addEventListener('input', () => {
                 display.textContent = slider.value;
-                drawChart();
+                // Reset animation when parameters change
+                clearInterval(chartInterval);
+                chartPlaying = false;
+                chartPeriod = 1;
+                currentPeriod = 1;
+                document.getElementById('chart-play').textContent = 'Play';
+                animateChart();
             });
         });
 
         // Initial draw
-        drawChart();
+        currentPeriod = 1;
+        animateChart();
     </script>
 </body>
 </html>
