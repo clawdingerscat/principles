@@ -772,8 +772,8 @@
 
         function drawPennyChart() {
             const million = 1000000;
-            const maxValue = 5368709.12; // Final penny value
-            const padding = { top: 30, right: 30, bottom: 40, left: 80 };
+            const maxValue = 6000000; // 6 million for clean axis
+            const padding = { top: 30, right: 30, bottom: 40, left: 70 };
             const chartWidth = pennyCanvas.width - padding.left - padding.right;
             const chartHeight = pennyCanvas.height - padding.top - padding.bottom;
 
@@ -784,25 +784,25 @@
             pennyCtx.fillStyle = '#0d1421';
             pennyCtx.fillRect(0, 0, pennyCanvas.width, pennyCanvas.height);
 
-            // Grid lines
+            // Grid lines - 0 to 6 million in steps of 1
             pennyCtx.strokeStyle = '#2a3a5e';
             pennyCtx.lineWidth = 1;
-            for (let i = 0; i <= 5; i++) {
-                const y = padding.top + (chartHeight * i / 5);
+            for (let i = 0; i <= 6; i++) {
+                const y = padding.top + (chartHeight * (6 - i) / 6);
                 pennyCtx.beginPath();
                 pennyCtx.moveTo(padding.left, y);
                 pennyCtx.lineTo(pennyCanvas.width - padding.right, y);
                 pennyCtx.stroke();
 
-                const value = maxValue - (maxValue * i / 5);
-                pennyCtx.fillStyle = '#666';
-                pennyCtx.font = '12px Georgia';
+                pennyCtx.fillStyle = '#aaa';
+                pennyCtx.font = '13px Georgia';
                 pennyCtx.textAlign = 'right';
-                pennyCtx.fillText(formatPennyMoney(value), padding.left - 10, y + 4);
+                pennyCtx.fillText('$' + i + 'M', padding.left - 10, y + 4);
             }
 
             // X-axis labels
-            pennyCtx.fillStyle = '#666';
+            pennyCtx.fillStyle = '#aaa';
+            pennyCtx.font = '13px Georgia';
             pennyCtx.textAlign = 'center';
             for (let i = 0; i <= 30; i += 5) {
                 const x = padding.left + (chartWidth * i / 30);
