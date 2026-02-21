@@ -232,6 +232,8 @@
             flex: 1;
             position: relative;
             overflow: hidden;
+            min-height: 400px;
+            background: var(--bg-primary);
         }
         
         #landscape-canvas {
@@ -949,8 +951,10 @@
         
         function resizeCanvas() {
             const container = state.canvas.parentElement;
-            state.canvas.width = container.clientWidth;
-            state.canvas.height = container.clientHeight;
+            const width = container.clientWidth || 800;
+            const height = container.clientHeight || 600;
+            state.canvas.width = width;
+            state.canvas.height = height;
             render();
         }
         
@@ -978,22 +982,22 @@
         
         function getFitnessColor(fitness, isNeighbor = false, isCurrent = false) {
             if (isCurrent) return '#e94560';
-            if (isNeighbor) return '#eaeaea';
+            if (isNeighbor) return '#4ecca3';  // Brighter green for neighbors
             
-            // Gradient from blue (low) to yellow/red (high)
+            // Gradient from cyan (low) to yellow/red (high) - better contrast
             const t = fitness;
             if (t < 0.5) {
-                // Blue to purple
-                const r = Math.floor(15 + t * 2 * 100);
-                const g = Math.floor(52 + t * 2 * 30);
-                const b = Math.floor(96 + t * 2 * 60);
+                // Cyan to blue
+                const r = Math.floor(0 + t * 2 * 100);
+                const g = Math.floor(200 + t * 2 * 55);
+                const b = Math.floor(255 - t * 2 * 100);
                 return `rgb(${r}, ${g}, ${b})`;
             } else {
-                // Purple to yellow/red
+                // Blue to yellow to red
                 const t2 = (t - 0.5) * 2;
-                const r = Math.floor(115 + t2 * 140);
-                const g = Math.floor(82 + t2 * 100);
-                const b = Math.floor(156 - t2 * 100);
+                const r = Math.floor(100 + t2 * 155);
+                const g = Math.floor(255 - t2 * 155);
+                const b = Math.floor(155 - t2 * 155);
                 return `rgb(${r}, ${g}, ${b})`;
             }
         }
@@ -1015,8 +1019,8 @@
             const neighbors = state.currentGenotype ? getNeighbors(state.currentGenotype) : [];
             
             // Draw connections between neighbors
-            ctx.strokeStyle = 'rgba(15, 52, 96, 0.2)';
-            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = 'rgba(100, 150, 200, 0.4)';
+            ctx.lineWidth = 1.5;
             
             for (const genotype of genotypes) {
                 const pos = state.positions.get(genotype);
